@@ -15375,10 +15375,8 @@ export type EventInputType = {
 	[key in Event['name']]: {
 		props: {
 			// @ts-ignore
-			[k in keyof EventByName<key>['props']]: Value
+			[k in keyof EventByName<key>['props']]: any
 		}
-		globals: { [x: string]: Value }
+		globals: { [x: string]: any }
 	}
 } & {}
-
-export type Value = number | null | string

@@ -61,9 +61,9 @@ function makeOrderedDictionary<T>(idGetter: (item: T) => string) {
 		},
 		clear: () => {
 			array.splice(0, array.length)
-			for(const key of Object.keys(dict)) {
+			Object.keys(dict).forEach(key => {
 				delete dict[key]
-			}
+			})
 		},
 		filter: (contain: (item: T) => boolean) => {
 			let i = 0

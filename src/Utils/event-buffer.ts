@@ -42,7 +42,6 @@ type BaileysBufferableEventEmitter = BaileysEventEmitter & {
 	 * */
 	buffer(): void
 	/** buffers all events till the promise completes */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	createBufferedFunction<A extends any[], T>(work: (...args: A) => Promise<T>): ((...args: A) => Promise<T>)
 	/**
 	 * flushes all buffered events
@@ -133,7 +132,7 @@ export const makeEventBuffer = (logger: Logger): BaileysBufferableEventEmitter =
 		},
 		emit<T extends BaileysEvent>(event: BaileysEvent, evData: BaileysEventMap[T]) {
 			if(buffersInProgress && BUFFERABLE_EVENT_SET.has(event)) {
-				append(data, historyCache, event as BufferableEvent, evData, logger)
+				append(data, historyCache, event as any, evData, logger)
 				return true
 			}
 
@@ -188,7 +187,6 @@ function append<E extends BufferableEvent>(
 	data: BufferedEventData,
 	historyCache: Set<string>,
 	event: E,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	eventData: any,
 	logger: Logger
 ) {
@@ -232,9 +230,6 @@ function append<E extends BufferableEvent>(
 		}
 
 		data.historySets.empty = false
-		data.historySets.syncType = eventData.syncType
-		data.historySets.progress = eventData.progress
-		data.historySets.peerDataRequestSessionId = eventData.peerDataRequestSessionId
 		data.historySets.isLatest = eventData.isLatest || data.historySets.isLatest
 
 		break
@@ -333,7 +328,7 @@ function append<E extends BufferableEvent>(
 			}
 
 			if(data.contactUpdates[contact.id]) {
-				upsert = Object.assign(data.contactUpdates[contact.id], trimUndefined(contact)) as Contact
+				upsert = Object.assign(data.contactUpdates[contact.id], trimUndefined(contact))
 				delete data.contactUpdates[contact.id]
 			}
 		}
@@ -526,10 +521,7 @@ function consolidateEvents(data: BufferedEventData) {
 			chats: Object.values(data.historySets.chats),
 			messages: Object.values(data.historySets.messages),
 			contacts: Object.values(data.historySets.contacts),
-			syncType: data.historySets.syncType,
-			progress: data.historySets.progress,
-			isLatest: data.historySets.isLatest,
-			peerDataRequestSessionId: data.historySets.peerDataRequestSessionId
+			isLatest: data.historySets.isLatest
 		}
 	}
 
@@ -600,10 +592,12 @@ function consolidateEvents(data: BufferedEventData) {
 }
 
 function concatChats<C extends Partial<Chat>>(a: C, b: Partial<Chat>) {
-	if(b.unreadCount === null && // neutralize unread counter
-		a.unreadCount! < 0) {
-		a.unreadCount = undefined
-		b.unreadCount = undefined
+	if(b.unreadCount === null) {
+		// neutralize unread counter
+		if(a.unreadCount! < 0) {
+			a.unreadCount = undefined
+			b.unreadCount = undefined
+		}
 	}
 
 	if(typeof a.unreadCount === 'number' && typeof b.unreadCount === 'number') {

@@ -12,7 +12,7 @@ const inflatePromise = promisify(inflate)
 
 export const downloadHistory = async(
 	msg: proto.Message.IHistorySyncNotification,
-	options: AxiosRequestConfig<{}>
+	options: AxiosRequestConfig<any>
 ) => {
 	const stream = await downloadContentFromMessage(msg, 'md-msg-hist', { options })
 	const bufferArray: Buffer[] = []
@@ -38,7 +38,6 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 	case proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP:
 	case proto.HistorySync.HistorySyncType.RECENT:
 	case proto.HistorySync.HistorySyncType.FULL:
-	case proto.HistorySync.HistorySyncType.ON_DEMAND:
 		for(const chat of item.conversations! as Chat[]) {
 			contacts.push({ id: chat.id, name: chat.name || undefined })
 
@@ -94,14 +93,12 @@ export const processHistoryMessage = (item: proto.IHistorySync) => {
 		chats,
 		contacts,
 		messages,
-		syncType: item.syncType,
-		progress: item.progress
 	}
 }
 
 export const downloadAndProcessHistorySyncNotification = async(
 	msg: proto.Message.IHistorySyncNotification,
-	options: AxiosRequestConfig<{}>
+	options: AxiosRequestConfig<any>
 ) => {
 	const historyMsg = await downloadHistory(msg, options)
 	return processHistoryMessage(historyMsg)

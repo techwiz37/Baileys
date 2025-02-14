@@ -16,11 +16,13 @@ const generateIV = (counter: number) => {
 export const makeNoiseHandler = ({
 	keyPair: { private: privateKey, public: publicKey },
 	NOISE_HEADER,
+	mobile,
 	logger,
 	routingInfo
 }: {
 	keyPair: KeyPair
 	NOISE_HEADER: Uint8Array
+	mobile: boolean
 	logger: Logger
 	routingInfo?: Buffer | undefined
 }) => {
@@ -111,12 +113,16 @@ export const makeNoiseHandler = ({
 
 			const certDecoded = decrypt(serverHello!.payload!)
 
-			const { intermediate: certIntermediate } = proto.CertChain.decode(certDecoded)
+			if(mobile) {
+				proto.CertChain.NoiseCertificate.decode(certDecoded)
+			} else {
+				const { intermediate: certIntermediate } = proto.CertChain.decode(certDecoded)
 
-			const { issuerSerial } = proto.CertChain.NoiseCertificate.Details.decode(certIntermediate!.details!)
+				const { issuerSerial } = proto.CertChain.NoiseCertificate.Details.decode(certIntermediate!.details!)
 
-			if(issuerSerial !== WA_CERT_DETAILS.SERIAL) {
-				throw new Boom('certification match failed', { statusCode: 400 })
+				if(issuerSerial !== WA_CERT_DETAILS.SERIAL) {
+					throw new Boom('certification match failed', { statusCode: 400 })
+				}
 			}
 
 			const keyEnc = encrypt(noiseKey.public)
@@ -157,7 +163,7 @@ export const makeNoiseHandler = ({
 
 			return frame
 		},
-		decodeFrame: async(newData: Buffer | Uint8Array, onFrame: (buff: Uint8Array | BinaryNode) => void) => {
+		decodeFrame: (newData: Buffer | Uint8Array, onFrame: (buff: Uint8Array | BinaryNode) => void) => {
 			// the binary protocol uses its own framing mechanism
 			// on top of the WS frames
 			// so we get this data and separate out the frames
@@ -177,11 +183,11 @@ export const makeNoiseHandler = ({
 				inBytes = inBytes.slice(size + 3)
 
 				if(isFinished) {
-					const result = decrypt(frame)
-					frame = await decodeBinaryNode(result)
+					const result = decrypt(frame as Uint8Array)
+					frame = decodeBinaryNode(result)
 				}
 
-				logger.trace({ msg: (frame as BinaryNode)?.attrs?.id }, 'recv frame')
+				logger.trace({ msg: (frame as any)?.attrs?.id }, 'recv frame')
 
 				onFrame(frame)
 				size = getBytesSize()

@@ -2,11 +2,7 @@ import { Contact } from './Contact'
 
 export type GroupParticipant = (Contact & { isAdmin?: boolean, isSuperAdmin?: boolean, admin?: 'admin' | 'superadmin' | null })
 
-export type ParticipantAction = 'add' | 'remove' | 'promote' | 'demote' | 'modify'
-
-export type RequestJoinAction = 'created' | 'revoked' | 'rejected'
-
-export type RequestJoinMethod = 'invite_link' | 'linked_group_join' | 'non_admin_add' | undefined
+export type ParticipantAction = 'add' | 'remove' | 'promote' | 'demote'
 
 export interface GroupMetadata {
     id: string
