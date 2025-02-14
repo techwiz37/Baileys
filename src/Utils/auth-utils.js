@@ -1,19 +1,9 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initAuthCreds = exports.addTransactionCapability = void 0;
-exports.makeCacheableSignalKeyStore = makeCacheableSignalKeyStore;
+exports.initAuthCreds = exports.addTransactionCapability = exports.makeCacheableSignalKeyStore = void 0;
 const crypto_1 = require("crypto");
 const node_cache_1 = __importDefault(require("node-cache"));
 const uuid_1 = require("uuid");
@@ -28,7 +18,7 @@ const generics_1 = require("./generics");
  */
 function makeCacheableSignalKeyStore(store, logger, _cache) {
     const cache = _cache || new node_cache_1.default({
-        stdTTL: Defaults_1.DEFAULT_CACHE_TTLS.SIGNAL_STORE, // 5 minutes
+        stdTTL: Defaults_1.DEFAULT_CACHE_TTLS.SIGNAL_STORE,
         useClones: false,
         deleteOnExpire: true,
     });
@@ -36,55 +26,50 @@ function makeCacheableSignalKeyStore(store, logger, _cache) {
         return `${type}.${id}`;
     }
     return {
-        get(type, ids) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const data = {};
-                const idsToFetch = [];
-                for (const id of ids) {
-                    const item = cache.get(getUniqueId(type, id));
-                    if (typeof item !== 'undefined') {
+        async get(type, ids) {
+            const data = {};
+            const idsToFetch = [];
+            for (const id of ids) {
+                const item = cache.get(getUniqueId(type, id));
+                if (typeof item !== 'undefined') {
+                    data[id] = item;
+                }
+                else {
+                    idsToFetch.push(id);
+                }
+            }
+            if (idsToFetch.length) {
+                logger.trace({ items: idsToFetch.length }, 'loading from store');
+                const fetched = await store.get(type, idsToFetch);
+                for (const id of idsToFetch) {
+                    const item = fetched[id];
+                    if (item) {
                         data[id] = item;
-                    }
-                    else {
-                        idsToFetch.push(id);
+                        cache.set(getUniqueId(type, id), item);
                     }
                 }
-                if (idsToFetch.length) {
-                    logger.trace({ items: idsToFetch.length }, 'loading from store');
-                    const fetched = yield store.get(type, idsToFetch);
-                    for (const id of idsToFetch) {
-                        const item = fetched[id];
-                        if (item) {
-                            data[id] = item;
-                            cache.set(getUniqueId(type, id), item);
-                        }
-                    }
-                }
-                return data;
-            });
+            }
+            return data;
         },
-        set(data) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let keys = 0;
-                for (const type in data) {
-                    for (const id in data[type]) {
-                        cache.set(getUniqueId(type, id), data[type][id]);
-                        keys += 1;
-                    }
+        async set(data) {
+            let keys = 0;
+            for (const type in data) {
+                for (const id in data[type]) {
+                    cache.set(getUniqueId(type, id), data[type][id]);
+                    keys += 1;
                 }
-                logger.trace({ keys }, 'updated cache');
-                yield store.set(data);
-            });
+            }
+            logger.trace({ keys }, 'updated cache');
+            await store.set(data);
         },
-        clear() {
-            return __awaiter(this, void 0, void 0, function* () {
-                var _a;
-                cache.flushAll();
-                yield ((_a = store.clear) === null || _a === void 0 ? void 0 : _a.call(store));
-            });
+        async clear() {
+            var _a;
+            cache.flushAll();
+            await ((_a = store.clear) === null || _a === void 0 ? void 0 : _a.call(store));
         }
     };
 }
+exports.makeCacheableSignalKeyStore = makeCacheableSignalKeyStore;
 /**
  * Adds DB like transaction capability (https://en.wikipedia.org/wiki/Database_transaction) to the SignalKeyStore,
  * this allows batch read & write operations & improves the performance of the lib
@@ -100,7 +85,7 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
     let mutations = {};
     let transactionsInProgress = 0;
     return {
-        get: (type, ids) => __awaiter(void 0, void 0, void 0, function* () {
+        get: async (type, ids) => {
             if (isInTransaction()) {
                 const dict = transactionCache[type];
                 const idsRequiringFetch = dict
@@ -109,7 +94,7 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
                 // only fetch if there are any items to fetch
                 if (idsRequiringFetch.length) {
                     dbQueriesInTransaction += 1;
-                    const result = yield state.get(type, idsRequiringFetch);
+                    const result = await state.get(type, idsRequiringFetch);
                     transactionCache[type] || (transactionCache[type] = {});
                     Object.assign(transactionCache[type], result);
                 }
@@ -125,7 +110,7 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
             else {
                 return state.get(type, ids);
             }
-        }),
+        },
         set: data => {
             if (isInTransaction()) {
                 logger.trace({ types: Object.keys(data) }, 'caching in transaction');
@@ -141,50 +126,48 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
             }
         },
         isInTransaction,
-        transaction(work) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let result;
-                transactionsInProgress += 1;
+        async transaction(work) {
+            let result;
+            transactionsInProgress += 1;
+            if (transactionsInProgress === 1) {
+                logger.trace('entering transaction');
+            }
+            try {
+                result = await work();
+                // commit if this is the outermost transaction
                 if (transactionsInProgress === 1) {
-                    logger.trace('entering transaction');
-                }
-                try {
-                    result = yield work();
-                    // commit if this is the outermost transaction
-                    if (transactionsInProgress === 1) {
-                        if (Object.keys(mutations).length) {
-                            logger.trace('committing transaction');
-                            // retry mechanism to ensure we've some recovery
-                            // in case a transaction fails in the first attempt
-                            let tries = maxCommitRetries;
-                            while (tries) {
-                                tries -= 1;
-                                try {
-                                    yield state.set(mutations);
-                                    logger.trace({ dbQueriesInTransaction }, 'committed transaction');
-                                    break;
-                                }
-                                catch (error) {
-                                    logger.warn(`failed to commit ${Object.keys(mutations).length} mutations, tries left=${tries}`);
-                                    yield (0, generics_1.delay)(delayBetweenTriesMs);
-                                }
+                    if (Object.keys(mutations).length) {
+                        logger.trace('committing transaction');
+                        // retry mechanism to ensure we've some recovery
+                        // in case a transaction fails in the first attempt
+                        let tries = maxCommitRetries;
+                        while (tries) {
+                            tries -= 1;
+                            try {
+                                await state.set(mutations);
+                                logger.trace({ dbQueriesInTransaction }, 'committed transaction');
+                                break;
+                            }
+                            catch (error) {
+                                logger.warn(`failed to commit ${Object.keys(mutations).length} mutations, tries left=${tries}`);
+                                await (0, generics_1.delay)(delayBetweenTriesMs);
                             }
                         }
-                        else {
-                            logger.trace('no mutations in transaction');
-                        }
+                    }
+                    else {
+                        logger.trace('no mutations in transaction');
                     }
                 }
-                finally {
-                    transactionsInProgress -= 1;
-                    if (transactionsInProgress === 0) {
-                        transactionCache = {};
-                        mutations = {};
-                        dbQueriesInTransaction = 0;
-                    }
+            }
+            finally {
+                transactionsInProgress -= 1;
+                if (transactionsInProgress === 0) {
+                    transactionCache = {};
+                    mutations = {};
+                    dbQueriesInTransaction = 0;
                 }
-                return result;
-            });
+            }
+            return result;
         }
     };
     function isInTransaction() {

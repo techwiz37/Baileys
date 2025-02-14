@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBinaryNodeMessages = exports.reduceBinaryNodeToDictionary = exports.assertNodeErrorFree = exports.getBinaryNodeChildUInt = exports.getBinaryNodeChildString = exports.getBinaryNodeChildBuffer = exports.getBinaryNodeChild = exports.getAllBinaryNodeChildren = exports.getBinaryNodeChildren = void 0;
-exports.binaryNodeToString = binaryNodeToString;
+exports.binaryNodeToString = exports.getBinaryNodeMessages = exports.reduceBinaryNodeToDictionary = exports.assertNodeErrorFree = exports.getBinaryNodeChildUInt = exports.getBinaryNodeChildString = exports.getBinaryNodeChildBuffer = exports.getBinaryNodeChild = exports.getAllBinaryNodeChildren = exports.getBinaryNodeChildren = void 0;
 const boom_1 = require("@hapi/boom");
 const WAProto_1 = require("../../WAProto");
 // some extra useful utilities
@@ -108,3 +107,4 @@ function binaryNodeToString(node, i = 0) {
     const content = children ? `>\n${children}\n${tabs(i)}</${node.tag}>` : '/>';
     return tag + content;
 }
+exports.binaryNodeToString = binaryNodeToString;

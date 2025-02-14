@@ -1,26 +1,10 @@
+
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __asyncValues = (this && this.__asyncValues) || function (o) {
-    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
-    var m = o[Symbol.asyncIterator], i;
-    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
-    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
-    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.updateMessageWithPollUpdate = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
-exports.getAggregateVotesInPollMessage = getAggregateVotesInPollMessage;
+exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.getAggregateVotesInPollMessage = exports.updateMessageWithPollUpdate = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
 const boom_1 = require("@hapi/boom");
 const axios_1 = __importDefault(require("axios"));
 const crypto_1 = require("crypto");
@@ -46,6 +30,7 @@ const MessageTypeProto = {
     'audio': Types_1.WAProto.Message.AudioMessage,
     'sticker': Types_1.WAProto.Message.StickerMessage,
     'document': Types_1.WAProto.Message.DocumentMessage,
+    'stickerpack': Types_1.WAProto.Message.StickerPackMessage
 };
 const ButtonType = WAProto_1.proto.Message.ButtonsMessage.HeaderType;
 /**
@@ -55,20 +40,20 @@ const ButtonType = WAProto_1.proto.Message.ButtonsMessage.HeaderType;
  */
 const extractUrlFromText = (text) => { var _a; return (_a = text.match(Defaults_1.URL_REGEX)) === null || _a === void 0 ? void 0 : _a[0]; };
 exports.extractUrlFromText = extractUrlFromText;
-const generateLinkPreviewIfRequired = (text, getUrlInfo, logger) => __awaiter(void 0, void 0, void 0, function* () {
+const generateLinkPreviewIfRequired = async (text, getUrlInfo, logger) => {
     const url = (0, exports.extractUrlFromText)(text);
     if (!!getUrlInfo && url) {
         try {
-            const urlInfo = yield getUrlInfo(url);
+            const urlInfo = await getUrlInfo(url);
             return urlInfo;
         }
         catch (error) { // ignore if fails
             logger === null || logger === void 0 ? void 0 : logger.warn({ trace: error.stack }, 'url generation failed');
         }
     }
-});
+};
 exports.generateLinkPreviewIfRequired = generateLinkPreviewIfRequired;
-const assertColor = (color) => __awaiter(void 0, void 0, void 0, function* () {
+const assertColor = async (color) => {
     let assertedColor;
     if (typeof color === 'number') {
         assertedColor = color > 0 ? color : 0xffffffff + Number(color) + 1;
@@ -81,8 +66,8 @@ const assertColor = (color) => __awaiter(void 0, void 0, void 0, function* () {
         assertedColor = parseInt(hex, 16);
         return assertedColor;
     }
-});
-const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, void 0, function* () {
+};
+const prepareWAMessageMedia = async (message, options) => {
     const logger = options.logger;
     let mediaType;
     for (const key of Defaults_1.MEDIA_KEYS) {
@@ -93,7 +78,10 @@ const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, vo
     if (!mediaType) {
         throw new boom_1.Boom('Invalid media type', { statusCode: 400 });
     }
-    const uploadData = Object.assign(Object.assign({}, message), { media: message[mediaType] });
+    const uploadData = {
+        ...message,
+        media: message[mediaType]
+    };
     delete uploadData[mediaType];
     // check if cacheable + generate cache key
     const cacheableKey = typeof uploadData.media === 'object' &&
@@ -115,7 +103,7 @@ const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, vo
             logger === null || logger === void 0 ? void 0 : logger.debug({ cacheableKey }, 'got media cache hit');
             const obj = Types_1.WAProto.Message.decode(mediaBuff);
             const key = `${mediaType}Message`;
-            Object.assign(obj[key], Object.assign(Object.assign({}, uploadData), { media: undefined }));
+            Object.assign(obj[key], { ...uploadData, media: undefined });
             return obj;
         }
     }
@@ -125,23 +113,23 @@ const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, vo
     const requiresWaveformProcessing = mediaType === 'audio' && uploadData.ptt === true;
     const requiresAudioBackground = options.backgroundColor && mediaType === 'audio' && uploadData.ptt === true;
     const requiresOriginalForSomeProcessing = requiresDurationComputation || requiresThumbnailComputation;
-    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath, } = yield (options.newsletter ? messages_media_1.prepareStream : messages_media_1.encryptedStream)(uploadData.media, options.mediaTypeOverride || mediaType, {
+    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath, } = await (options.newsletter ? messages_media_1.prepareStream : messages_media_1.encryptedStream)(uploadData.media, options.mediaTypeOverride || mediaType, {
         logger,
         saveOriginalFileIfRequired: requiresOriginalForSomeProcessing,
         opts: options.options
     });
     // url safe Base64 encode the SHA256 hash of the body
     const fileEncSha256B64 = (options.newsletter ? fileSha256 : fileEncSha256 !== null && fileEncSha256 !== void 0 ? fileEncSha256 : fileSha256).toString('base64');
-    const [{ mediaUrl, directPath, handle }] = yield Promise.all([
-        (() => __awaiter(void 0, void 0, void 0, function* () {
-            const result = yield options.upload(encWriteStream, { fileEncSha256B64, mediaType, timeoutMs: options.mediaUploadTimeoutMs });
+    const [{ mediaUrl, directPath, handle }] = await Promise.all([
+        (async () => {
+            const result = await options.upload(encWriteStream, { fileEncSha256B64, mediaType, timeoutMs: options.mediaUploadTimeoutMs });
             logger === null || logger === void 0 ? void 0 : logger.debug({ mediaType, cacheableKey }, 'uploaded media');
             return result;
-        }))(),
-        (() => __awaiter(void 0, void 0, void 0, function* () {
+        })(),
+        (async () => {
             try {
                 if (requiresThumbnailComputation) {
-                    const { thumbnail, originalImageDimensions } = yield (0, messages_media_1.generateThumbnail)(bodyPath, mediaType, options);
+                    const { thumbnail, originalImageDimensions } = await (0, messages_media_1.generateThumbnail)(bodyPath, mediaType, options);
                     uploadData.jpegThumbnail = thumbnail;
                     if (!uploadData.width && originalImageDimensions) {
                         uploadData.width = originalImageDimensions.width;
@@ -151,40 +139,49 @@ const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, vo
                     logger === null || logger === void 0 ? void 0 : logger.debug('generated thumbnail');
                 }
                 if (requiresDurationComputation) {
-                    uploadData.seconds = yield (0, messages_media_1.getAudioDuration)(bodyPath);
+                    uploadData.seconds = await (0, messages_media_1.getAudioDuration)(bodyPath);
                     logger === null || logger === void 0 ? void 0 : logger.debug('computed audio duration');
                 }
                 if (requiresWaveformProcessing) {
-                    uploadData.waveform = yield (0, messages_media_1.getAudioWaveform)(bodyPath, logger);
+                    uploadData.waveform = await (0, messages_media_1.getAudioWaveform)(bodyPath, logger);
                     logger === null || logger === void 0 ? void 0 : logger.debug('processed waveform');
                 }
                 if (requiresWaveformProcessing) {
-                    uploadData.waveform = yield (0, messages_media_1.getAudioWaveform)(bodyPath, logger);
+                    uploadData.waveform = await (0, messages_media_1.getAudioWaveform)(bodyPath, logger);
                     logger === null || logger === void 0 ? void 0 : logger.debug('processed waveform');
                 }
                 if (requiresAudioBackground) {
-                    uploadData.backgroundArgb = yield assertColor(options.backgroundColor);
+                    uploadData.backgroundArgb = await assertColor(options.backgroundColor);
                     logger === null || logger === void 0 ? void 0 : logger.debug('computed backgroundColor audio status');
                 }
             }
             catch (error) {
                 logger === null || logger === void 0 ? void 0 : logger.warn({ trace: error.stack }, 'failed to obtain extra info');
             }
-        }))(),
+        })(),
     ])
-        .finally(() => __awaiter(void 0, void 0, void 0, function* () {
+        .finally(async () => {
         if (!Buffer.isBuffer(encWriteStream)) {
             encWriteStream.destroy();
         }
         // remove tmp files
         if (didSaveToTmpPath && bodyPath) {
-            yield fs_1.promises.unlink(bodyPath);
+            await fs_1.promises.unlink(bodyPath);
             logger === null || logger === void 0 ? void 0 : logger.debug('removed tmp files');
         }
-    }));
+    });
     const obj = Types_1.WAProto.Message.fromObject({
-        [`${mediaType}Message`]: MessageTypeProto[mediaType].fromObject(Object.assign(Object.assign({ url: handle ? undefined : mediaUrl, directPath, mediaKey: mediaKey, fileEncSha256: fileEncSha256, fileSha256,
-            fileLength, mediaKeyTimestamp: handle ? undefined : (0, generics_1.unixTimestampSeconds)() }, uploadData), { media: undefined }))
+        [`${mediaType}Message`]: MessageTypeProto[mediaType].fromObject({
+            url: handle ? undefined : mediaUrl,
+            directPath,
+            mediaKey: mediaKey,
+            fileEncSha256: fileEncSha256,
+            fileSha256,
+            fileLength,
+            mediaKeyTimestamp: handle ? undefined : (0, generics_1.unixTimestampSeconds)(),
+            ...uploadData,
+            media: undefined
+        })
     });
     if (uploadData.ptv) {
         obj.ptvMessage = obj.videoMessage;
@@ -195,7 +192,7 @@ const prepareWAMessageMedia = (message, options) => __awaiter(void 0, void 0, vo
         options.mediaCache.set(cacheableKey, Types_1.WAProto.Message.encode(obj).finish());
     }
     return obj;
-});
+};
 exports.prepareWAMessageMedia = prepareWAMessageMedia;
 const prepareDisappearingMessageSettingContent = (ephemeralExpiration) => {
     ephemeralExpiration = ephemeralExpiration || 0;
@@ -243,7 +240,7 @@ const generateForwardMessageContent = (message, forceForward) => {
     return content;
 };
 exports.generateForwardMessageContent = generateForwardMessageContent;
-const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0, void 0, function* () {
+const generateWAMessageContent = async (message, options) => {
     var _a;
     var _b;
     let m = {};
@@ -251,7 +248,7 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
         const extContent = { text: message.text };
         let urlInfo = message.linkPreview;
         if (typeof urlInfo === 'undefined') {
-            urlInfo = yield (0, exports.generateLinkPreviewIfRequired)(message.text, options.getUrlInfo, options.logger);
+            urlInfo = await (0, exports.generateLinkPreviewIfRequired)(message.text, options.getUrlInfo, options.logger);
         }
         if (urlInfo) {
             extContent.canonicalUrl = urlInfo['canonical-url'];
@@ -272,7 +269,7 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
             }
         }
         if (options.backgroundColor) {
-            extContent.backgroundArgb = yield assertColor(options.backgroundColor);
+            extContent.backgroundArgb = await assertColor(options.backgroundColor);
         }
         if (options.font) {
             extContent.font = options.font;
@@ -305,7 +302,7 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
             key: message.delete,
             type: Types_1.WAProto.Message.ProtocolMessage.Type.REVOKE
         };
-    }
+    }   
     else if ('forward' in message) {
         m = (0, exports.generateForwardMessageContent)(message.forward, message.force);
     }
@@ -314,6 +311,43 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
             (message.disappearingMessagesInChat ? Defaults_1.WA_DEFAULT_EPHEMERAL : 0) :
             message.disappearingMessagesInChat;
         m = (0, exports.prepareDisappearingMessageSettingContent)(exp);
+    }
+    else if ('groupInvite' in message) {
+        m.groupInviteMessage = {
+            inviteCode: message.groupInvite.code, 
+            inviteExpiration: message.groupInvite.expiration, 
+            caption: message.groupInvite.caption, 
+            groupJid: message.groupInvite.jid, 
+            groupName: message.groupInvite.name, 
+            jpegThumbnail: message.groupInvite.jpegThumbnail
+        }
+   }
+   else if ('pin' in message) {
+        m.messageContextInfo = {
+        	messageAddOnDurationInSecs: message.pin.time || 86400
+        }
+        m.pinInChatMessage = {
+            key: message.pin.key, 
+            type: 1,
+            senderTimestampMs: Date.now()
+         }
+    }
+    else if ('unpin' in message) {
+        m.messageContextInfo = {
+        	messageAddOnDurationInSecs: 0
+        }
+        m.pinInChatMessage = {
+            key: message.unpin.key, 
+            type: 2,
+            senderTimestampMs: Date.now()
+         }
+    }
+    else if ('call' in message) {
+         m.scheduledCallCreationMessage = {
+        	scheduledTimestampMs: message.call.time || Date.now(), 
+            callType: message.call.type || 1, 
+            title: message.call.name
+         }
     }
     else if ('buttonReply' in message) {
         switch (message.type) {
@@ -333,12 +367,22 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
                 break;
         }
     }
+    else if ('ptv' in message && message.ptv) {
+        const { videoMessage } = await (0, exports.prepareWAMessageMedia)({ video: message.video }, options);
+        m.ptvMessage = videoMessage;
+    }
     else if ('product' in message) {
-        const { imageMessage } = yield (0, exports.prepareWAMessageMedia)({ image: message.product.productImage }, options);
-        m.productMessage = Types_1.WAProto.Message.ProductMessage.fromObject(Object.assign(Object.assign({}, message), { product: Object.assign(Object.assign({}, message.product), { productImage: imageMessage }) }));
+        const { imageMessage } = await (0, exports.prepareWAMessageMedia)({ image: message.product.productImage }, options);
+        m.productMessage = Types_1.WAProto.Message.ProductMessage.fromObject({
+            ...message,
+            product: {
+                ...message.product,
+                productImage: imageMessage,
+            }
+        });
     }
     else if ('listReply' in message) {
-        m.listResponseMessage = Object.assign({}, message.listReply);
+        m.listResponseMessage = { ...message.listReply };
     }
     else if ('poll' in message) {
         (_b = message.poll).selectableCount || (_b.selectableCount = 0);
@@ -350,7 +394,6 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
             throw new boom_1.Boom(`poll.selectableCount in poll should be >= 0 and <= ${message.poll.values.length}`, { statusCode: 400 });
         }
         m.messageContextInfo = {
-            // encKey
             messageSecret: message.poll.messageSecret || (0, crypto_1.randomBytes)(32),
         };
         m.pollCreationMessage = {
@@ -359,7 +402,30 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
             options: message.poll.values.map(optionName => ({ optionName })),
         };
     }
-    else if ('sharePhoneNumber' in message) {
+    else if ('event' in message) {
+   	let futureDate = new Date();
+       futureDate.setDate(futureDate.getDate() + 1);   	
+   	m.messageContextInfo = {
+          messageSecret: message.event.messageScret || crypto_1.randomBytes(32).toString('base64'), 
+       }
+       m.eventMessage = {
+          isCanceled: message.event.cancel || false, 
+          name: message.event.name,
+          description: message.event.description,            
+          joinLink: message.event.joinLink || 'https://call.whatsapp.com/voice/VFnmoNASaBMCTL7ATPReu2',
+          startTime: message.event.startTime || Math.floor(futureDate.getTime() / 1000)
+       }
+   }
+   else if ('inviteAdmin' in message) {
+   	m.newsletterAdminInviteMessage = {
+          newsletterJid: message.inviteAdmin.jid,
+          newsletterName: message.inviteAdmin.name, 
+          caption: message.inviteAdmin.caption, 
+          inviteExpiration: message.inviteAdmin.expiration, 
+          jpegThumbnail: message.inviteAdmin.jpegThumbnail
+       }
+   }
+   else if ('sharePhoneNumber' in message) {
         m.protocolMessage = {
             type: WAProto_1.proto.Message.ProtocolMessage.Type.SHARE_PHONE_NUMBER
         };
@@ -368,11 +434,11 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
         m.requestPhoneNumberMessage = {};
     }
     else {
-        m = yield (0, exports.prepareWAMessageMedia)(message, options);
+        m = await (0, exports.prepareWAMessageMedia)(message, options);
     }
     if ('buttons' in message && !!message.buttons) {
         const buttonsMessage = {
-            buttons: message.buttons.map(b => (Object.assign(Object.assign({}, b), { type: WAProto_1.proto.Message.ButtonsMessage.Button.Type.RESPONSE })))
+            buttons: message.buttons.map(b => ({ ...b, type: WAProto_1.proto.Message.ButtonsMessage.Button.Type.RESPONSE }))
         };
         if ('text' in message) {
             buttonsMessage.contentText = message.text;
@@ -413,7 +479,7 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
                 hydratedTemplate: msg
             }
         };
-    }
+    }    
     if ('sections' in message && !!message.sections) {
         const listMessage = {
             sections: message.sections,
@@ -425,9 +491,71 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
         };
         m = { listMessage };
     }
+    if ('interactiveButtons' in message && !!message.interactiveButtons) {
+    const image = message?.header?.image
+        ? await (0, exports.prepareWAMessageMedia)(
+              { image: message.header.image, ...options },
+              options
+          )
+        : null;
+      const video = message?.header?.video
+          ? await (0, exports.prepareWAMessageMedia)(
+                { video: message.header.video, ...options },
+                options
+            )
+          : null;
+      const document = message?.header?.document
+          ? await (0, exports.prepareWAMessageMedia)(
+                { document: message.header.document, ...options },
+                options
+            )
+          : null;
+        const interactiveMessage = {
+            viewOnceMessageV2Extension: {
+                message: {
+                   messageContextInfo: {
+                     deviceListMetadata: {},
+                       deviceListMetadataVersion: 2,
+                    },
+                  interactiveMessage: WAProto_1.proto.Message.InteractiveMessage.create({
+                    contextInfo: message?.contextInfo, 
+                      body: WAProto_1.proto.Message.InteractiveMessage.Body.create({
+                          text: message?.text,
+                      }),
+                      footer: WAProto_1.proto.Message.InteractiveMessage.Footer.create({
+                          text: message?.footer,
+                      }),
+                      header: WAProto_1.proto.Message.InteractiveMessage.Body.create({
+                      	title: message?.title, 
+                          subtitle: message?.subtitle, 
+                          hasMediaAttachment: message.header?.hasMediaAttachment ?? false,
+                          imageMessage: image ? image.imageMessage : null,
+                          videoMessage: video ? video.videoMessage : null,
+                          documentMessage: document ? document.documentMessage : null,
+                          locationMessage: message?.header?.location ?? null,
+                          productMessage: message?.header?.product ?? null,
+                       }),
+                      nativeFlowMessage: WAProto_1.proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                           buttons: message.interactiveButtons,
+                       }),
+                  }),
+              },
+          },
+    };
+    m = interactiveMessage;
+   }
     if ('viewOnce' in message && !!message.viewOnce) {
         m = { viewOnceMessage: { message: m } };
     }
+    if ('viewOnceV2' in message && !!message.viewOnceV2) {
+        m = { viewOnceMessageV2: { message: m } };
+    }
+    if ('viewOnceV2Extension' in message && !!message.viewOnceV2Extension) {
+        m = { viewOnceMessageV2Extension: { message: m } };
+    }
+    if ('ephemeral' in message && !!message.ephemeral) {
+    	m = { ephemeralMessage: { message: m } };
+    }   
     if ('mentions' in message && ((_a = message.mentions) === null || _a === void 0 ? void 0 : _a.length)) {
         const [messageType] = Object.keys(m);
         m[messageType].contextInfo = m[messageType] || {};
@@ -447,9 +575,9 @@ const generateWAMessageContent = (message, options) => __awaiter(void 0, void 0,
         const [messageType] = Object.keys(m);
         m[messageType] = m[messageType] || {};
         m[messageType].contextInfo = message.contextInfo;
-    }
+    }   
     return Types_1.WAProto.Message.fromObject(m);
-});
+};
 exports.generateWAMessageContent = generateWAMessageContent;
 const generateWAMessageFromContent = (jid, message, options) => {
     // set timestamp to now
@@ -461,7 +589,7 @@ const generateWAMessageFromContent = (jid, message, options) => {
     const key = (0, exports.getContentType)(innerMessage);
     const timestamp = (0, generics_1.unixTimestampSeconds)(options.timestamp);
     const { quoted, userJid } = options;
-    if (quoted) {
+    if (quoted && !(0, WABinary_1.isJidNewsletter)(jid)) {
         const participant = quoted.key.fromMe ? userJid : (quoted.participant || quoted.key.participant || quoted.key.remoteJid);
         let quotedMsg = (0, exports.normalizeMessageContent)(quoted.message);
         const msgType = (0, exports.getContentType)(quotedMsg);
@@ -488,8 +616,14 @@ const generateWAMessageFromContent = (jid, message, options) => {
         // and it's not a protocol message -- delete, toggle disappear message
         key !== 'protocolMessage' &&
         // already not converted to disappearing message
-        key !== 'ephemeralMessage') {
-        innerMessage[key].contextInfo = Object.assign(Object.assign({}, (innerMessage[key].contextInfo || {})), { expiration: options.ephemeralExpiration || Defaults_1.WA_DEFAULT_EPHEMERAL });
+        key !== 'ephemeralMessage' &&
+        // newsletter not accept disappearing messages
+        !(0, WABinary_1.isJidNewsletter)(jid)) {
+        innerMessage[key].contextInfo = {
+            ...(innerMessage[key].contextInfo || {}),
+            expiration: options.ephemeralExpiration || Defaults_1.WA_DEFAULT_EPHEMERAL,
+            //ephemeralSettingTimestamp: options.ephemeralOptions.eph_setting_ts?.toString()
+        };
     }
     message = Types_1.WAProto.Message.fromObject(message);
     const messageJSON = {
@@ -507,12 +641,12 @@ const generateWAMessageFromContent = (jid, message, options) => {
     return Types_1.WAProto.WebMessageInfo.fromObject(messageJSON);
 };
 exports.generateWAMessageFromContent = generateWAMessageFromContent;
-const generateWAMessage = (jid, content, options) => __awaiter(void 0, void 0, void 0, function* () {
+const generateWAMessage = async (jid, content, options) => {
     var _a;
     // ensure msg ID is with every log
     options.logger = (_a = options === null || options === void 0 ? void 0 : options.logger) === null || _a === void 0 ? void 0 : _a.child({ msgId: options.messageId });
-    return (0, exports.generateWAMessageFromContent)(jid, yield (0, exports.generateWAMessageContent)(content, Object.assign({ newsletter: (0, WABinary_1.isJidNewsLetter)(jid) }, options)), options);
-});
+    return (0, exports.generateWAMessageFromContent)(jid, await (0, exports.generateWAMessageContent)(content, { newsletter: (0, WABinary_1.isJidNewsletter)(jid), ...options }), options);
+};
 exports.generateWAMessage = generateWAMessage;
 /** Get the key to access the true type of content */
 const getContentType = (content) => {
@@ -542,13 +676,27 @@ const normalizeMessageContent = (content) => {
         content = inner.message;
     }
     return content;
+
     function getFutureProofMessage(message) {
-        return ((message === null || message === void 0 ? void 0 : message.ephemeralMessage)
+        return (
+               (message === null || message === void 0 ? void 0 : message.editedMessage)
+            || (message === null || message === void 0 ? void 0 : message.statusAddYours) 
+            || (message === null || message === void 0 ? void 0 : message.eventCoverImage) 
+            || (message === null || message === void 0 ? void 0 : message.botInvokeMessage) 
             || (message === null || message === void 0 ? void 0 : message.viewOnceMessage)
-            || (message === null || message === void 0 ? void 0 : message.documentWithCaptionMessage)
+            || (message === null || message === void 0 ? void 0 : message.ephemeralMessage)
+            || (message === null || message === void 0 ? void 0 : message.lottieStickerMessage)
+            || (message === null || message === void 0 ? void 0 : message.groupStatusMessage)  
             || (message === null || message === void 0 ? void 0 : message.viewOnceMessageV2)
-            || (message === null || message === void 0 ? void 0 : message.viewOnceMessageV2Extension)
-            || (message === null || message === void 0 ? void 0 : message.editedMessage));
+            || (message === null || message === void 0 ? void 0 : message.statusMentionMessage)
+            || (message === null || message === void 0 ? void 0 : message.pollCreationMessageV4)
+            || (message === null || message === void 0 ? void 0 : message.pollCreationMessageV5)             
+            || (message === null || message === void 0 ? void 0 : message.associatedChildMessage)
+            || (message === null || message === void 0 ? void 0 : message.groupMentionedMessage)             
+            || (message === null || message === void 0 ? void 0 : message.groupStatusMentionMessage) 
+            || (message === null || message === void 0 ? void 0 : message.viewOnceMessageV2Extension)            
+            || (message === null || message === void 0 ? void 0 : message.documentWithCaptionMessage)
+            || (message === null || message === void 0 ? void 0 : message.pollCreationOptionImageMessage));
     }
 };
 exports.normalizeMessageContent = normalizeMessageContent;
@@ -557,7 +705,7 @@ exports.normalizeMessageContent = normalizeMessageContent;
  * Eg. extracts the inner message from a disappearing message/view once message
  */
 const extractMessageContent = (content) => {
-    var _a, _b, _c, _d, _e, _f;
+    let _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const extractFromTemplateMessage = (msg) => {
         if (msg.imageMessage) {
             return { imageMessage: msg.imageMessage };
@@ -583,14 +731,32 @@ const extractMessageContent = (content) => {
     if (content === null || content === void 0 ? void 0 : content.buttonsMessage) {
         return extractFromTemplateMessage(content.buttonsMessage);
     }
-    if ((_a = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _a === void 0 ? void 0 : _a.hydratedFourRowTemplate) {
-        return extractFromTemplateMessage((_b = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _b === void 0 ? void 0 : _b.hydratedFourRowTemplate);
+    if (content === null || content === void 0 ? void 0 : content.listMessage) {
+    	return extractFromTemplateMessage(content.listMessage);
     }
-    if ((_c = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _c === void 0 ? void 0 : _c.hydratedTemplate) {
-        return extractFromTemplateMessage((_d = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _d === void 0 ? void 0 : _d.hydratedTemplate);
+    if ((_a = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _a === void 0 ? void 0 : _a.interactiveMessageTemplate) {
+    	return extractFromTemplateMessage((_b = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _b === void 0 ? void 0 : _b.interactiveMessageTemplate);
     }
-    if ((_e = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _e === void 0 ? void 0 : _e.fourRowTemplate) {
-        return extractFromTemplateMessage((_f = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _f === void 0 ? void 0 : _f.fourRowTemplate);
+    if ((_c = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _c === void 0 ? void 0 : _c.hydratedFourRowTemplate) {
+        return extractFromTemplateMessage((_d = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _d === void 0 ? void 0 : _d.hydratedFourRowTemplate);
+    }
+    if ((_e = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _e === void 0 ? void 0 : _e.hydratedTemplate) {
+        return extractFromTemplateMessage((_f = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _f === void 0 ? void 0 : _f.hydratedTemplate);
+    }
+    if ((_g = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _g === void 0 ? void 0 : _g.fourRowTemplate) {
+        return extractFromTemplateMessage((_h = content === null || content === void 0 ? void 0 : content.templateMessage) === null || _h === void 0 ? void 0 : _h.fourRowTemplate);
+    }
+    if ((_i = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _i === void 0 ? void 0 : _i.shopStorefrontMessage) {
+    	return extractFromTemplateMessage((_j = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _j === void 0 ? void 0 : _j.shopStorefrontMessage);
+    }
+    if ((_k = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _k === void 0 ? void 0 : _k.collectionMessage) {
+    	return extractFromTemplateMessage((_l = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _l === void 0 ? void 0 : _l.collectionMessage);
+    }
+    if ((_m = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _m === void 0 ? void 0 : _m.nativeFlowMessage) {
+    	return extractFromTemplateMessage((_n = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _n === void 0 ? void 0 : _n.nativeFlowMessage);
+    }
+    if ((_o = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _o === void 0 ? void 0 : _o.carouselMessage) {
+    	return extractFromTemplateMessage((_p = content === null || content === void 0 ? void 0 : content.interactiveMessage) === null || _p === void 0 ? void 0 : _p.carouselMessage);
     }
     return content;
 };
@@ -672,6 +838,7 @@ function getAggregateVotesInPollMessage({ message, pollUpdates }, meId) {
     }
     return Object.values(voteHashMap);
 }
+exports.getAggregateVotesInPollMessage = getAggregateVotesInPollMessage;
 /** Given a list of message keys, aggregates them by chat & sender. Useful for sending read receipts in bulk */
 const aggregateMessageKeysNotFromMe = (keys) => {
     const keyMap = {};
@@ -695,9 +862,9 @@ const REUPLOAD_REQUIRED_STATUS = [410, 404];
 /**
  * Downloads the given message. Throws an error if it's not a media message
  */
-const downloadMediaMessage = (message, type, options, ctx) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield downloadMsg()
-        .catch((error) => __awaiter(void 0, void 0, void 0, function* () {
+const downloadMediaMessage = async (message, type, options, ctx) => {
+    const result = await downloadMsg()
+        .catch(async (error) => {
         var _a;
         if (ctx) {
             if (axios_1.default.isAxiosError(error)) {
@@ -705,63 +872,48 @@ const downloadMediaMessage = (message, type, options, ctx) => __awaiter(void 0, 
                 if (REUPLOAD_REQUIRED_STATUS.includes((_a = error.response) === null || _a === void 0 ? void 0 : _a.status)) {
                     ctx.logger.info({ key: message.key }, 'sending reupload media request...');
                     // request reupload
-                    message = yield ctx.reuploadRequest(message);
-                    const result = yield downloadMsg();
+                    message = await ctx.reuploadRequest(message);
+                    const result = await downloadMsg();
                     return result;
                 }
             }
         }
         throw error;
-    }));
+    });
     return result;
-    function downloadMsg() {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, e_1, _b, _c;
-            const mContent = (0, exports.extractMessageContent)(message.message);
-            if (!mContent) {
-                throw new boom_1.Boom('No message present', { statusCode: 400, data: message });
+    async function downloadMsg() {
+        const mContent = (0, exports.extractMessageContent)(message.message);
+        if (!mContent) {
+            throw new boom_1.Boom('No message present', { statusCode: 400, data: message });
+        }
+        const contentType = (0, exports.getContentType)(mContent);
+        let mediaType = contentType === null || contentType === void 0 ? void 0 : contentType.replace('Message', '');
+        const media = mContent[contentType];
+        if (!media || typeof media !== 'object' || (!('url' in media) && !('thumbnailDirectPath' in media))) {
+            throw new boom_1.Boom(`"${contentType}" message is not a media message`);
+        }
+        let download;
+        if ('thumbnailDirectPath' in media && !('url' in media)) {
+            download = {
+                directPath: media.thumbnailDirectPath,
+                mediaKey: media.mediaKey
+            };
+            mediaType = 'thumbnail-link';
+        }
+        else {
+            download = media;
+        }
+        const stream = await (0, messages_media_1.downloadContentFromMessage)(download, mediaType, options);
+        if (type === 'buffer') {
+            const bufferArray = [];
+            for await (const chunk of stream) {
+                bufferArray.push(chunk);
             }
-            const contentType = (0, exports.getContentType)(mContent);
-            let mediaType = contentType === null || contentType === void 0 ? void 0 : contentType.replace('Message', '');
-            const media = mContent[contentType];
-            if (!media || typeof media !== 'object' || (!('url' in media) && !('thumbnailDirectPath' in media))) {
-                throw new boom_1.Boom(`"${contentType}" message is not a media message`);
-            }
-            let download;
-            if ('thumbnailDirectPath' in media && !('url' in media)) {
-                download = {
-                    directPath: media.thumbnailDirectPath,
-                    mediaKey: media.mediaKey
-                };
-                mediaType = 'thumbnail-link';
-            }
-            else {
-                download = media;
-            }
-            const stream = yield (0, messages_media_1.downloadContentFromMessage)(download, mediaType, options);
-            if (type === 'buffer') {
-                const bufferArray = [];
-                try {
-                    for (var _d = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield stream_1.next(), _a = stream_1_1.done, !_a; _d = true) {
-                        _c = stream_1_1.value;
-                        _d = false;
-                        const chunk = _c;
-                        bufferArray.push(chunk);
-                    }
-                }
-                catch (e_1_1) { e_1 = { error: e_1_1 }; }
-                finally {
-                    try {
-                        if (!_d && !_a && (_b = stream_1.return)) yield _b.call(stream_1);
-                    }
-                    finally { if (e_1) throw e_1.error; }
-                }
-                return Buffer.concat(bufferArray);
-            }
-            return stream;
-        });
+            return Buffer.concat(bufferArray);
+        }
+        return stream;
     }
-});
+};
 exports.downloadMediaMessage = downloadMediaMessage;
 /** Checks whether the given message is a media message; if it is returns the inner content */
 const assertMediaContent = (content) => {

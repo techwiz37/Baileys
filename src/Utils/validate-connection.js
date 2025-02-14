@@ -17,12 +17,24 @@ const getUserAgent = (config) => {
     const manufacturer = config.mobile ? 'Apple' : '';
     const platform = config.mobile ? WAProto_1.proto.ClientPayload.UserAgent.Platform.IOS : WAProto_1.proto.ClientPayload.UserAgent.Platform.WEB;
     const phoneId = config.mobile ? { phoneId: config.auth.creds.phoneId } : {};
-    return Object.assign({ appVersion: {
+    return {
+        appVersion: {
             primary: version[0],
             secondary: version[1],
             tertiary: version[2],
-        }, platform, releaseChannel: WAProto_1.proto.ClientPayload.UserAgent.ReleaseChannel.RELEASE, mcc: ((_a = config.auth.creds.registration) === null || _a === void 0 ? void 0 : _a.phoneNumberMobileCountryCode) || '000', mnc: ((_b = config.auth.creds.registration) === null || _b === void 0 ? void 0 : _b.phoneNumberMobileNetworkCode) || '000', osVersion: osVersion, manufacturer,
-        device, osBuildNumber: osVersion, localeLanguageIso6391: 'en', localeCountryIso31661Alpha2: 'US' }, phoneId);
+        },
+        platform,
+        releaseChannel: WAProto_1.proto.ClientPayload.UserAgent.ReleaseChannel.RELEASE,
+        mcc: ((_a = config.auth.creds.registration) === null || _a === void 0 ? void 0 : _a.phoneNumberMobileCountryCode) || '000',
+        mnc: ((_b = config.auth.creds.registration) === null || _b === void 0 ? void 0 : _b.phoneNumberMobileNetworkCode) || '000',
+        osVersion: osVersion,
+        manufacturer,
+        device,
+        osBuildNumber: osVersion,
+        localeLanguageIso6391: 'en',
+        localeCountryIso31661Alpha2: 'US',
+        ...phoneId
+    };
 };
 const PLATFORM_MAP = {
     'Mac OS': WAProto_1.proto.ClientPayload.WebInfo.WebSubPlatform.DARWIN,
@@ -50,16 +62,31 @@ const generateMobileNode = (config) => {
     if (!config.auth.creds) {
         throw new boom_1.Boom('No registration data found', { data: config });
     }
-    const payload = Object.assign(Object.assign({}, getClientPayload(config)), { sessionId: Math.floor(Math.random() * 999999999 + 1), shortConnect: true, connectAttemptCount: 0, device: 0, dnsSource: {
+    const payload = {
+        ...getClientPayload(config),
+        sessionId: Math.floor(Math.random() * 999999999 + 1),
+        shortConnect: true,
+        connectAttemptCount: 0,
+        device: 0,
+        dnsSource: {
             appCached: false,
             dnsMethod: WAProto_1.proto.ClientPayload.DNSSource.DNSResolutionMethod.SYSTEM,
-        }, passive: false, pushName: 'test', username: Number(`${config.auth.creds.registration.phoneNumberCountryCode}${config.auth.creds.registration.phoneNumberNationalNumber}`) });
+        },
+        passive: false,
+        pushName: 'test',
+        username: Number(`${config.auth.creds.registration.phoneNumberCountryCode}${config.auth.creds.registration.phoneNumberNationalNumber}`),
+    };
     return WAProto_1.proto.ClientPayload.fromObject(payload);
 };
 exports.generateMobileNode = generateMobileNode;
 const generateLoginNode = (userJid, config) => {
     const { user, device } = (0, WABinary_1.jidDecode)(userJid);
-    const payload = Object.assign(Object.assign({}, getClientPayload(config)), { passive: true, username: +user, device: device });
+    const payload = {
+        ...getClientPayload(config),
+        passive: true,
+        username: +user,
+        device: device,
+    };
     return WAProto_1.proto.ClientPayload.fromObject(payload);
 };
 exports.generateLoginNode = generateLoginNode;
@@ -79,7 +106,10 @@ const generateRegistrationNode = ({ registrationId, signedPreKey, signedIdentity
         requireFullSync: config.syncFullHistory,
     };
     const companionProto = WAProto_1.proto.DeviceProps.encode(companion).finish();
-    const registerPayload = Object.assign(Object.assign({}, getClientPayload(config)), { passive: false, devicePairingData: {
+    const registerPayload = {
+        ...getClientPayload(config),
+        passive: false,
+        devicePairingData: {
             buildHash: appVersionBuf,
             deviceProps: companionProto,
             eRegid: (0, generics_1.encodeBigEndian)(registrationId),
@@ -88,7 +118,8 @@ const generateRegistrationNode = ({ registrationId, signedPreKey, signedIdentity
             eSkeyId: (0, generics_1.encodeBigEndian)(signedPreKey.keyId, 3),
             eSkeyVal: signedPreKey.keyPair.public,
             eSkeySig: signedPreKey.signature,
-        } });
+        },
+    };
     return WAProto_1.proto.ClientPayload.fromObject(registerPayload);
 };
 exports.generateRegistrationNode = generateRegistrationNode;
@@ -161,7 +192,7 @@ const configureSuccessfulPairing = (stanza, { advSecretKey, signedIdentityKey, s
 exports.configureSuccessfulPairing = configureSuccessfulPairing;
 const encodeSignedDeviceIdentity = (account, includeSignatureKey) => {
     var _a;
-    account = Object.assign({}, account);
+    account = { ...account };
     // set to null if we are not to include the signature key
     // or if we are including the signature key but it is empty
     if (!includeSignatureKey || !((_a = account.accountSignatureKey) === null || _a === void 0 ? void 0 : _a.length)) {

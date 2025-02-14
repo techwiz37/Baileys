@@ -1,12 +1,6 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.useMultiFileAuthState = void 0;
@@ -15,6 +9,8 @@ const path_1 = require("path");
 const WAProto_1 = require("../../WAProto");
 const auth_utils_1 = require("./auth-utils");
 const generics_1 = require("./generics");
+const async_lock_1 = __importDefault(require("async-lock"));
+const fileLock = new async_lock_1.default({ maxPending: Infinity });
 /**
  * stores the full authentication state in a single folder.
  * Far more efficient than singlefileauthstate
@@ -22,53 +18,56 @@ const generics_1 = require("./generics");
  * Again, I wouldn't endorse this for any production level use other than perhaps a bot.
  * Would recommend writing an auth state for use with a proper SQL or No-SQL DB
  * */
-const useMultiFileAuthState = (folder) => __awaiter(void 0, void 0, void 0, function* () {
+const useMultiFileAuthState = async (folder) => {
     const writeData = (data, file) => {
-        return (0, promises_1.writeFile)((0, path_1.join)(folder, fixFileName(file)), JSON.stringify(data, generics_1.BufferJSON.replacer));
+        const filePath = (0, path_1.join)(folder, fixFileName(file));
+        return fileLock.acquire(filePath, () => (0, promises_1.writeFile)((0, path_1.join)(filePath), JSON.stringify(data, generics_1.BufferJSON.replacer)));
     };
-    const readData = (file) => __awaiter(void 0, void 0, void 0, function* () {
+    const readData = async (file) => {
         try {
-            const data = yield (0, promises_1.readFile)((0, path_1.join)(folder, fixFileName(file)), { encoding: 'utf-8' });
+            const filePath = (0, path_1.join)(folder, fixFileName(file));
+            const data = await fileLock.acquire(filePath, () => (0, promises_1.readFile)(filePath, { encoding: 'utf-8' }));
             return JSON.parse(data, generics_1.BufferJSON.reviver);
         }
         catch (error) {
             return null;
         }
-    });
-    const removeData = (file) => __awaiter(void 0, void 0, void 0, function* () {
+    };
+    const removeData = async (file) => {
         try {
-            yield (0, promises_1.unlink)((0, path_1.join)(folder, fixFileName(file)));
+            const filePath = (0, path_1.join)(folder, fixFileName(file));
+            await fileLock.acquire(filePath, () => (0, promises_1.unlink)(filePath));
         }
         catch (_a) {
         }
-    });
-    const folderInfo = yield (0, promises_1.stat)(folder).catch(() => { });
+    };
+    const folderInfo = await (0, promises_1.stat)(folder).catch(() => { });
     if (folderInfo) {
         if (!folderInfo.isDirectory()) {
             throw new Error(`found something that is not a directory at ${folder}, either delete it or specify a different location`);
         }
     }
     else {
-        yield (0, promises_1.mkdir)(folder, { recursive: true });
+        await (0, promises_1.mkdir)(folder, { recursive: true });
     }
     const fixFileName = (file) => { var _a; return (_a = file === null || file === void 0 ? void 0 : file.replace(/\//g, '__')) === null || _a === void 0 ? void 0 : _a.replace(/:/g, '-'); };
-    const creds = (yield readData('creds.json')) || (0, auth_utils_1.initAuthCreds)();
+    const creds = await readData('creds.json') || (0, auth_utils_1.initAuthCreds)();
     return {
         state: {
             creds,
             keys: {
-                get: (type, ids) => __awaiter(void 0, void 0, void 0, function* () {
+                get: async (type, ids) => {
                     const data = {};
-                    yield Promise.all(ids.map((id) => __awaiter(void 0, void 0, void 0, function* () {
-                        let value = yield readData(`${type}-${id}.json`);
+                    await Promise.all(ids.map(async (id) => {
+                        let value = await readData(`${type}-${id}.json`);
                         if (type === 'app-state-sync-key' && value) {
                             value = WAProto_1.proto.Message.AppStateSyncKeyData.fromObject(value);
                         }
                         data[id] = value;
-                    })));
+                    }));
                     return data;
-                }),
-                set: (data) => __awaiter(void 0, void 0, void 0, function* () {
+                },
+                set: async (data) => {
                     const tasks = [];
                     for (const category in data) {
                         for (const id in data[category]) {
@@ -77,13 +76,13 @@ const useMultiFileAuthState = (folder) => __awaiter(void 0, void 0, void 0, func
                             tasks.push(value ? writeData(value, file) : removeData(file));
                         }
                     }
-                    yield Promise.all(tasks);
-                })
+                    await Promise.all(tasks);
+                }
             }
         },
         saveCreds: () => {
             return writeData(creds, 'creds.json');
         }
     };
-});
+};
 exports.useMultiFileAuthState = useMultiFileAuthState;

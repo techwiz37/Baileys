@@ -1,15 +1,7 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getNextPreKeysNode = exports.getNextPreKeys = exports.extractDeviceJids = exports.parseAndInjectE2ESessions = exports.xmppPreKey = exports.xmppSignedPreKey = exports.generateOrGetPreKeys = exports.getPreKeys = exports.createSignalIdentity = void 0;
+const lodash_1 = require("lodash");
 const Defaults_1 = require("../Defaults");
 const WABinary_1 = require("../WABinary");
 const crypto_1 = require("./crypto");
@@ -21,13 +13,13 @@ const createSignalIdentity = (wid, accountSignatureKey) => {
     };
 };
 exports.createSignalIdentity = createSignalIdentity;
-const getPreKeys = (_a, min_1, limit_1) => __awaiter(void 0, [_a, min_1, limit_1], void 0, function* ({ get }, min, limit) {
+const getPreKeys = async ({ get }, min, limit) => {
     const idList = [];
     for (let id = min; id < limit; id++) {
         idList.push(id.toString());
     }
     return get('pre-key', idList);
-});
+};
 exports.getPreKeys = getPreKeys;
 const generateOrGetPreKeys = (creds, range) => {
     const avaliable = creds.nextPreKeyId - creds.firstUnuploadedPreKeyId;
@@ -65,7 +57,7 @@ const xmppPreKey = (pair, id) => ({
     ]
 });
 exports.xmppPreKey = xmppPreKey;
-const parseAndInjectE2ESessions = (node, repository) => __awaiter(void 0, void 0, void 0, function* () {
+const parseAndInjectE2ESessions = async (node, repository) => {
     const extractKey = (key) => (key ? ({
         keyId: (0, WABinary_1.getBinaryNodeChildUInt)(key, 'id', 3),
         publicKey: (0, crypto_1.generateSignalPubKey)((0, WABinary_1.getBinaryNodeChildBuffer)(key, 'value')),
@@ -75,23 +67,32 @@ const parseAndInjectE2ESessions = (node, repository) => __awaiter(void 0, void 0
     for (const node of nodes) {
         (0, WABinary_1.assertNodeErrorFree)(node);
     }
-    yield Promise.all(nodes.map((node) => __awaiter(void 0, void 0, void 0, function* () {
-        const signedKey = (0, WABinary_1.getBinaryNodeChild)(node, 'skey');
-        const key = (0, WABinary_1.getBinaryNodeChild)(node, 'key');
-        const identity = (0, WABinary_1.getBinaryNodeChildBuffer)(node, 'identity');
-        const jid = node.attrs.jid;
-        const registrationId = (0, WABinary_1.getBinaryNodeChildUInt)(node, 'registration', 4);
-        yield repository.injectE2ESession({
-            jid,
-            session: {
-                registrationId: registrationId,
-                identityKey: (0, crypto_1.generateSignalPubKey)(identity),
-                signedPreKey: extractKey(signedKey),
-                preKey: extractKey(key)
-            }
-        });
-    })));
-});
+    // Most of the work in repository.injectE2ESession is CPU intensive, not IO
+    // So Promise.all doesn't really help here,
+    // but blocks even loop if we're using it inside keys.transaction, and it makes it "sync" actually
+    // This way we chunk it in smaller parts and between those parts we can yield to the event loop
+    // It's rare case when you need to E2E sessions for so many users, but it's possible
+    const chunkSize = 100;
+    const chunks = (0, lodash_1.chunk)(nodes, chunkSize);
+    for (const nodesChunk of chunks) {
+        await Promise.all(nodesChunk.map(async (node) => {
+            const signedKey = (0, WABinary_1.getBinaryNodeChild)(node, 'skey');
+            const key = (0, WABinary_1.getBinaryNodeChild)(node, 'key');
+            const identity = (0, WABinary_1.getBinaryNodeChildBuffer)(node, 'identity');
+            const jid = node.attrs.jid;
+            const registrationId = (0, WABinary_1.getBinaryNodeChildUInt)(node, 'registration', 4);
+            await repository.injectE2ESession({
+                jid,
+                session: {
+                    registrationId: registrationId,
+                    identityKey: (0, crypto_1.generateSignalPubKey)(identity),
+                    signedPreKey: extractKey(signedKey),
+                    preKey: extractKey(key)
+                }
+            });
+        }));
+    }
+};
 exports.parseAndInjectE2ESessions = parseAndInjectE2ESessions;
 const extractDeviceJids = (result, myJid, excludeZeroDevices) => {
     var _a;
@@ -126,20 +127,20 @@ exports.extractDeviceJids = extractDeviceJids;
  * get the next N keys for upload or processing
  * @param count number of pre-keys to get or generate
  */
-const getNextPreKeys = (_a, count_1) => __awaiter(void 0, [_a, count_1], void 0, function* ({ creds, keys }, count) {
+const getNextPreKeys = async ({ creds, keys }, count) => {
     const { newPreKeys, lastPreKeyId, preKeysRange } = (0, exports.generateOrGetPreKeys)(creds, count);
     const update = {
         nextPreKeyId: Math.max(lastPreKeyId + 1, creds.nextPreKeyId),
         firstUnuploadedPreKeyId: Math.max(creds.firstUnuploadedPreKeyId, lastPreKeyId + 1)
     };
-    yield keys.set({ 'pre-key': newPreKeys });
-    const preKeys = yield (0, exports.getPreKeys)(keys, preKeysRange[0], preKeysRange[0] + preKeysRange[1]);
+    await keys.set({ 'pre-key': newPreKeys });
+    const preKeys = await (0, exports.getPreKeys)(keys, preKeysRange[0], preKeysRange[0] + preKeysRange[1]);
     return { update, preKeys };
-});
+};
 exports.getNextPreKeys = getNextPreKeys;
-const getNextPreKeysNode = (state, count) => __awaiter(void 0, void 0, void 0, function* () {
+const getNextPreKeysNode = async (state, count) => {
     const { creds } = state;
-    const { update, preKeys } = yield (0, exports.getNextPreKeys)(state, count);
+    const { update, preKeys } = await (0, exports.getNextPreKeys)(state, count);
     const node = {
         tag: 'iq',
         attrs: {
@@ -156,5 +157,5 @@ const getNextPreKeysNode = (state, count) => __awaiter(void 0, void 0, void 0, f
         ]
     };
     return { update, node };
-});
+};
 exports.getNextPreKeysNode = getNextPreKeysNode;

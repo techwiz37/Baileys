@@ -1,16 +1,18 @@
 {
   "name": "baileys",
   "version": "6.7.13",
-  "description": "Baileys fixed bug & button",
+  "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
     "js-whatsapp",
     "whatsapp-api",
     "whatsapp-web",
+    "whatsapp-chat",
+    "whatsapp-group",
+    "automation",
     "multi-device",
-    "md",
-    "amirul-dev",
-    " techwiz37"
+    "amiruldev",
+    "techwiz"
   ],
   "homepage": "https://github.com/techwiz37/Baileys",
   "repository": {
@@ -50,7 +52,7 @@
     "cache-manager": "4.0.1",
     "futoin-hkdf": "^1.5.1",
     "libphonenumber-js": "^1.10.20",
-    "libsignal": "github:adiwajshing/signal-node",
+    "libsignal": "github:techwiz37/signal-node",
     "music-metadata": "^7.12.3",
     "node-cache": "^5.1.2",
     "pino": "^7.0.0",

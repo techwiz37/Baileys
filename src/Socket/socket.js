@@ -1,19 +1,15 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeSocket = void 0;
 const boom_1 = require("@hapi/boom");
+const axios_1 = __importDefault(require("axios"));
 const crypto_1 = require("crypto");
 const url_1 = require("url");
 const util_1 = require("util");
+const child_process_1 = require("child_process");
 const WAProto_1 = require("../../WAProto");
 const Defaults_1 = require("../Defaults");
 const Types_1 = require("../Types");
@@ -63,21 +59,21 @@ const makeSocket = (config) => {
     const generateMessageTag = () => `${uqTagId}${epoch++}`;
     const sendPromise = (0, util_1.promisify)(ws.send);
     /** send a raw buffer */
-    const sendRawMessage = (data) => __awaiter(void 0, void 0, void 0, function* () {
+    const sendRawMessage = async (data) => {
         if (!ws.isOpen) {
             throw new boom_1.Boom('Connection Closed', { statusCode: Types_1.DisconnectReason.connectionClosed });
         }
         const bytes = noise.encodeFrame(data);
-        yield (0, Utils_1.promiseTimeout)(connectTimeoutMs, (resolve, reject) => __awaiter(void 0, void 0, void 0, function* () {
+        await (0, Utils_1.promiseTimeout)(connectTimeoutMs, async (resolve, reject) => {
             try {
-                yield sendPromise.call(ws, bytes);
+                await sendPromise.call(ws, bytes);
                 resolve();
             }
             catch (error) {
                 reject(error);
             }
-        }));
-    });
+        });
+    };
     /** send a binary node */
     const sendNode = (frame) => {
         if (logger.level === 'trace') {
@@ -91,7 +87,7 @@ const makeSocket = (config) => {
         logger.error({ err }, `unexpected error in '${msg}'`);
     };
     /** await the next incoming message */
-    const awaitNextMessage = (sendMsg) => __awaiter(void 0, void 0, void 0, function* () {
+    const awaitNextMessage = async (sendMsg) => {
         if (!ws.isOpen) {
             throw new boom_1.Boom('Connection Closed', {
                 statusCode: Types_1.DisconnectReason.connectionClosed
@@ -115,17 +111,17 @@ const makeSocket = (config) => {
             sendRawMessage(sendMsg).catch(onClose);
         }
         return result;
-    });
+    };
     /**
      * Wait for a message with a certain tag to be received
      * @param msgId the message tag to await
      * @param timeoutMs timeout after which the promise will reject
      */
-    const waitForMessage = (msgId_1, ...args_1) => __awaiter(void 0, [msgId_1, ...args_1], void 0, function* (msgId, timeoutMs = defaultQueryTimeoutMs) {
+    const waitForMessage = async (msgId, timeoutMs = defaultQueryTimeoutMs) => {
         let onRecv;
         let onErr;
         try {
-            return yield (0, Utils_1.promiseTimeout)(timeoutMs, (resolve, reject) => {
+            return await (0, Utils_1.promiseTimeout)(timeoutMs, (resolve, reject) => {
                 onRecv = resolve;
                 onErr = err => {
                     reject(err || new boom_1.Boom('Connection Closed', { statusCode: Types_1.DisconnectReason.connectionClosed }));
@@ -140,30 +136,30 @@ const makeSocket = (config) => {
             ws.off('close', onErr); // if the socket closes, you'll never receive the message
             ws.off('error', onErr);
         }
-    });
+    };
     /** send a query, and wait for its response. auto-generates message ID if not provided */
-    const query = (node, timeoutMs) => __awaiter(void 0, void 0, void 0, function* () {
+    const query = async (node, timeoutMs) => {
         if (!node.attrs.id) {
             node.attrs.id = generateMessageTag();
         }
         const msgId = node.attrs.id;
         const wait = waitForMessage(msgId, timeoutMs);
-        yield sendNode(node);
-        const result = yield wait;
+        await sendNode(node);
+        const result = await wait;
         if ('tag' in result) {
             (0, WABinary_1.assertNodeErrorFree)(result);
         }
         return result;
-    });
+    };
     /** connection handshake */
-    const validateConnection = () => __awaiter(void 0, void 0, void 0, function* () {
+    const validateConnection = async () => {
         let helloMsg = {
             clientHello: { ephemeral: ephemeralKeyPair.public }
         };
         helloMsg = WAProto_1.proto.HandshakeMessage.fromObject(helloMsg);
         logger.info({ browser, helloMsg }, 'connected to WA');
         const init = WAProto_1.proto.HandshakeMessage.encode(helloMsg).finish();
-        const result = yield awaitNextMessage(init);
+        const result = await awaitNextMessage(init);
         const handshake = WAProto_1.proto.HandshakeMessage.decode(result);
         logger.trace({ handshake }, 'handshake recv from WA');
         const keyEnc = noise.processHandshake(handshake, creds.noiseKey);
@@ -180,7 +176,7 @@ const makeSocket = (config) => {
             logger.info({ node }, 'logging in...');
         }
         const payloadEnc = noise.encrypt(WAProto_1.proto.ClientPayload.encode(node).finish());
-        yield sendRawMessage(WAProto_1.proto.HandshakeMessage.encode({
+        await sendRawMessage(WAProto_1.proto.HandshakeMessage.encode({
             clientFinish: {
                 static: keyEnc,
                 payload: payloadEnc,
@@ -188,9 +184,9 @@ const makeSocket = (config) => {
         }).finish());
         noise.finishInit();
         startKeepAliveRequest();
-    });
-    const getAvailablePreKeysOnServer = () => __awaiter(void 0, void 0, void 0, function* () {
-        const result = yield query({
+    };
+    const getAvailablePreKeysOnServer = async () => {
+        const result = await query({
             tag: 'iq',
             attrs: {
                 id: generateMessageTag(),
@@ -204,24 +200,24 @@ const makeSocket = (config) => {
         });
         const countChild = (0, WABinary_1.getBinaryNodeChild)(result, 'count');
         return +countChild.attrs.value;
-    });
+    };
     /** generates and uploads a set of pre-keys to the server */
-    const uploadPreKeys = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (count = Defaults_1.INITIAL_PREKEY_COUNT) {
-        yield keys.transaction(() => __awaiter(void 0, void 0, void 0, function* () {
+    const uploadPreKeys = async (count = Defaults_1.INITIAL_PREKEY_COUNT) => {
+        await keys.transaction(async () => {
             logger.info({ count }, 'uploading pre-keys');
-            const { update, node } = yield (0, Utils_1.getNextPreKeysNode)({ creds, keys }, count);
-            yield query(node);
+            const { update, node } = await (0, Utils_1.getNextPreKeysNode)({ creds, keys }, count);
+            await query(node);
             ev.emit('creds.update', update);
             logger.info({ count }, 'uploaded pre-keys');
-        }));
-    });
-    const uploadPreKeysToServerIfRequired = () => __awaiter(void 0, void 0, void 0, function* () {
-        const preKeyCount = yield getAvailablePreKeysOnServer();
+        });
+    };
+    const uploadPreKeysToServerIfRequired = async () => {
+        const preKeyCount = await getAvailablePreKeysOnServer();
         logger.info(`${preKeyCount} pre-keys found on server`);
         if (preKeyCount <= Defaults_1.MIN_PREKEY_COUNT) {
-            yield uploadPreKeys();
+            await uploadPreKeys();
         }
-    });
+    };
     const onMessageReceived = (data) => {
         noise.decodeFrame(data, frame => {
             var _a;
@@ -282,7 +278,7 @@ const makeSocket = (config) => {
         });
         ev.removeAllListeners('connection.update');
     };
-    const waitForSocketOpen = () => __awaiter(void 0, void 0, void 0, function* () {
+    const waitForSocketOpen = async () => {
         if (ws.isOpen) {
             return;
         }
@@ -291,7 +287,7 @@ const makeSocket = (config) => {
         }
         let onOpen;
         let onClose;
-        yield new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
             onOpen = () => resolve(undefined);
             onClose = mapWebSocketError(reject);
             ws.on('open', onOpen);
@@ -303,7 +299,7 @@ const makeSocket = (config) => {
             ws.off('close', onClose);
             ws.off('error', onClose);
         });
-    });
+    };
     const startKeepAliveRequest = () => (keepAliveReq = setInterval(() => {
         if (!lastDateRecv) {
             lastDateRecv = new Date();
@@ -349,11 +345,11 @@ const makeSocket = (config) => {
         ]
     }));
     /** logout & invalidate connection */
-    const logout = (msg) => __awaiter(void 0, void 0, void 0, function* () {
+    const logout = async (msg) => {
         var _a;
         const jid = (_a = authState.creds.me) === null || _a === void 0 ? void 0 : _a.id;
         if (jid) {
-            yield sendNode({
+            await sendNode({
                 tag: 'iq',
                 attrs: {
                     to: WABinary_1.S_WHATSAPP_NET,
@@ -373,15 +369,15 @@ const makeSocket = (config) => {
             });
         }
         end(new boom_1.Boom(msg || 'Intentional Logout', { statusCode: Types_1.DisconnectReason.loggedOut }));
-    });
-    const requestPairingCode = (phoneNumber) => __awaiter(void 0, void 0, void 0, function* () {
+    };
+    const requestPairingCode = async (phoneNumber) => {
         authState.creds.pairingCode = (0, Utils_1.bytesToCrockford)((0, crypto_1.randomBytes)(5));
         authState.creds.me = {
             id: (0, WABinary_1.jidEncode)(phoneNumber, 's.whatsapp.net'),
             name: '~'
         };
         ev.emit('creds.update', authState.creds);
-        yield sendNode({
+        await sendNode({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -402,7 +398,7 @@ const makeSocket = (config) => {
                         {
                             tag: 'link_code_pairing_wrapped_companion_ephemeral_pub',
                             attrs: {},
-                            content: yield generatePairingKey()
+                            content: await generatePairingKey()
                         },
                         {
                             tag: 'companion_server_auth_key_pub',
@@ -412,7 +408,7 @@ const makeSocket = (config) => {
                         {
                             tag: 'companion_platform_id',
                             attrs: {},
-                            content: '49' // Chrome
+                            content: (0, Utils_1.getPlatformId)(browser[1])
                         },
                         {
                             tag: 'companion_platform_display',
@@ -429,15 +425,13 @@ const makeSocket = (config) => {
             ]
         });
         return authState.creds.pairingCode;
-    });
-    function generatePairingKey() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const salt = (0, crypto_1.randomBytes)(32);
-            const randomIv = (0, crypto_1.randomBytes)(16);
-            const key = (0, Utils_1.derivePairingCodeKey)(authState.creds.pairingCode, salt);
-            const ciphered = (0, Utils_1.aesEncryptCTR)(authState.creds.pairingEphemeralKeyPair.public, key, randomIv);
-            return Buffer.concat([salt, randomIv, ciphered]);
-        });
+    };
+    async function generatePairingKey() {
+        const salt = (0, crypto_1.randomBytes)(32);
+        const randomIv = (0, crypto_1.randomBytes)(16);
+        const key = await (0, Utils_1.derivePairingCodeKey)(authState.creds.pairingCode, salt);
+        const ciphered = (0, Utils_1.aesEncryptCTR)(authState.creds.pairingEphemeralKeyPair.public, key, randomIv);
+        return Buffer.concat([salt, randomIv, ciphered]);
     }
     const sendWAMBuffer = (wamBuffer) => {
         return query({
@@ -457,21 +451,21 @@ const makeSocket = (config) => {
         });
     };
     ws.on('message', onMessageReceived);
-    ws.on('open', () => __awaiter(void 0, void 0, void 0, function* () {
+    ws.on('open', async () => {
         try {
-            yield validateConnection();
+            await validateConnection();
         }
         catch (err) {
             logger.error({ err }, 'error in validating connection');
             end(err);
         }
-    }));
+    });
     ws.on('error', mapWebSocketError(end));
     ws.on('close', () => end(new boom_1.Boom('Connection Terminated', { statusCode: Types_1.DisconnectReason.connectionClosed })));
     // the server terminated the connection
     ws.on('CB:xmlstreamend', () => end(new boom_1.Boom('Connection Terminated by Server', { statusCode: Types_1.DisconnectReason.connectionClosed })));
     // QR gen
-    ws.on('CB:iq,type:set,pair-device', (stanza) => __awaiter(void 0, void 0, void 0, function* () {
+    ws.on('CB:iq,type:set,pair-device', async (stanza) => {
         const iq = {
             tag: 'iq',
             attrs: {
@@ -480,7 +474,7 @@ const makeSocket = (config) => {
                 id: stanza.attrs.id,
             }
         };
-        yield sendNode(iq);
+        await sendNode(iq);
         const pairDeviceNode = (0, WABinary_1.getBinaryNodeChild)(stanza, 'pair-device');
         const refNodes = (0, WABinary_1.getBinaryNodeChildren)(pairDeviceNode, 'ref');
         const noiseKeyB64 = Buffer.from(creds.noiseKey.public).toString('base64');
@@ -503,32 +497,38 @@ const makeSocket = (config) => {
             qrMs = qrTimeout || 20000; // shorter subsequent qrs
         };
         genPairQR();
-    }));
+    });
     // device paired for the first time
     // if device pairs successfully, the server asks to restart the connection
-    ws.on('CB:iq,,pair-success', (stanza) => __awaiter(void 0, void 0, void 0, function* () {
+    ws.on('CB:iq,,pair-success', async (stanza) => {
         logger.debug('pair success recv');
         try {
             const { reply, creds: updatedCreds } = (0, Utils_1.configureSuccessfulPairing)(stanza, creds);
             logger.info({ me: updatedCreds.me, platform: updatedCreds.platform }, 'pairing configured successfully, expect to restart the connection...');
             ev.emit('creds.update', updatedCreds);
             ev.emit('connection.update', { isNewLogin: true, qr: undefined });
-            yield sendNode(reply);
+            await sendNode(reply);
         }
         catch (error) {
             logger.info({ trace: error.stack }, 'error in pairing');
             end(error);
         }
-    }));
+    });
     // login complete
-    ws.on('CB:success', (node) => __awaiter(void 0, void 0, void 0, function* () {
-        yield uploadPreKeysToServerIfRequired();
-        yield sendPassiveIq('active');
-        logger.info('opened connection to WA');
-        clearTimeout(qrTimer); // will never happen in all likelyhood -- but just in case WA sends success on first try
-        ev.emit('creds.update', { me: Object.assign(Object.assign({}, authState.creds.me), { lid: node.attrs.lid }) });
-        ev.emit('connection.update', { connection: 'open' });
-    }));
+    ws.on('CB:success', async (node) => {
+        try {
+            await uploadPreKeysToServerIfRequired();
+            await sendPassiveIq('active');
+            logger.info('opened connection to WA');
+            clearTimeout(qrTimer); // will never happen in all likelyhood -- but just in case WA sends success on first try
+            ev.emit('creds.update', { me: { ...authState.creds.me, lid: node.attrs.lid } });
+            ev.emit('connection.update', { connection: 'open' });
+        }
+        catch (err) {
+            logger.error({ err }, 'error opening connection');
+            end(err);
+        }
+    });
     ws.on('CB:stream:error', (node) => {
         logger.error({ node }, 'stream errored out');
         const { reason, statusCode } = (0, Utils_1.getErrorCodeFromStreamError)(node);
@@ -547,6 +547,7 @@ const makeSocket = (config) => {
         const routingInfo = (0, WABinary_1.getBinaryNodeChild)(edgeRoutingNode, 'routing_info');
         if (routingInfo === null || routingInfo === void 0 ? void 0 : routingInfo.content) {
             authState.creds.routingInfo = Buffer.from(routingInfo === null || routingInfo === void 0 ? void 0 : routingInfo.content);
+            ev.emit('creds.update', authState.creds);
         }
     });
     let didStartBuffer = false;
@@ -592,7 +593,7 @@ const makeSocket = (config) => {
         (0, Utils_1.printQRIfNecessaryListener)(ev, logger);
     }
     return {
-        type: 'md',
+        type: 'meta',
         ws,
         ev,
         authState: { creds, keys },
