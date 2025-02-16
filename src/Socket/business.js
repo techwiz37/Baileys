@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeBusinessSocket = void 0;
 const business_1 = require("../Utils/business");
@@ -8,9 +17,9 @@ const messages_recv_1 = require("./messages-recv");
 const makeBusinessSocket = (config) => {
     const sock = (0, messages_recv_1.makeMessagesRecvSocket)(config);
     const { authState, query, waUploadToServer } = sock;
-    const getCatalog = async ({ jid, limit, cursor }) => {
-        var _a;
-        jid = jid || ((_a = authState.creds.me) === null || _a === void 0 ? void 0 : _a.id);
+    const getCatalog = (_a) => __awaiter(void 0, [_a], void 0, function* ({ jid, limit, cursor }) {
+        var _b;
+        jid = jid || ((_b = authState.creds.me) === null || _b === void 0 ? void 0 : _b.id);
         jid = (0, WABinary_1.jidNormalizedUser)(jid);
         const queryParamNodes = [
             {
@@ -36,7 +45,7 @@ const makeBusinessSocket = (config) => {
                 content: cursor
             });
         }
-        const result = await query({
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -55,12 +64,12 @@ const makeBusinessSocket = (config) => {
             ]
         });
         return (0, business_1.parseCatalogNode)(result);
-    };
-    const getCollections = async (jid, limit = 51) => {
+    });
+    const getCollections = (jid_1, ...args_1) => __awaiter(void 0, [jid_1, ...args_1], void 0, function* (jid, limit = 51) {
         var _a;
         jid = jid || ((_a = authState.creds.me) === null || _a === void 0 ? void 0 : _a.id);
         jid = (0, WABinary_1.jidNormalizedUser)(jid);
-        const result = await query({
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -100,9 +109,9 @@ const makeBusinessSocket = (config) => {
             ]
         });
         return (0, business_1.parseCollectionsNode)(result);
-    };
-    const getOrderDetails = async (orderId, tokenBase64) => {
-        const result = await query({
+    });
+    const getOrderDetails = (orderId, tokenBase64) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -144,11 +153,11 @@ const makeBusinessSocket = (config) => {
             ]
         });
         return (0, business_1.parseOrderDetailsNode)(result);
-    };
-    const productUpdate = async (productId, update) => {
-        update = await (0, business_1.uploadingNecessaryImagesOfProduct)(update, waUploadToServer);
+    });
+    const productUpdate = (productId, update) => __awaiter(void 0, void 0, void 0, function* () {
+        update = yield (0, business_1.uploadingNecessaryImagesOfProduct)(update, waUploadToServer);
         const editNode = (0, business_1.toProductNode)(productId, update);
-        const result = await query({
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -178,13 +187,13 @@ const makeBusinessSocket = (config) => {
         const productCatalogEditNode = (0, generic_utils_1.getBinaryNodeChild)(result, 'product_catalog_edit');
         const productNode = (0, generic_utils_1.getBinaryNodeChild)(productCatalogEditNode, 'product');
         return (0, business_1.parseProductNode)(productNode);
-    };
-    const productCreate = async (create) => {
+    });
+    const productCreate = (create) => __awaiter(void 0, void 0, void 0, function* () {
         // ensure isHidden is defined
         create.isHidden = !!create.isHidden;
-        create = await (0, business_1.uploadingNecessaryImagesOfProduct)(create, waUploadToServer);
+        create = yield (0, business_1.uploadingNecessaryImagesOfProduct)(create, waUploadToServer);
         const createNode = (0, business_1.toProductNode)(undefined, create);
-        const result = await query({
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -214,9 +223,9 @@ const makeBusinessSocket = (config) => {
         const productCatalogAddNode = (0, generic_utils_1.getBinaryNodeChild)(result, 'product_catalog_add');
         const productNode = (0, generic_utils_1.getBinaryNodeChild)(productCatalogAddNode, 'product');
         return (0, business_1.parseProductNode)(productNode);
-    };
-    const productDelete = async (productIds) => {
-        const result = await query({
+    });
+    const productDelete = (productIds) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: WABinary_1.S_WHATSAPP_NET,
@@ -245,16 +254,12 @@ const makeBusinessSocket = (config) => {
         return {
             deleted: +((productCatalogDelNode === null || productCatalogDelNode === void 0 ? void 0 : productCatalogDelNode.attrs.deleted_count) || 0)
         };
-    };
-    return {
-        ...sock,
-        logger: config.logger,
-        getOrderDetails,
+    });
+    return Object.assign(Object.assign({}, sock), { logger: config.logger, getOrderDetails,
         getCatalog,
         getCollections,
         productCreate,
         productDelete,
-        productUpdate
-    };
+        productUpdate });
 };
 exports.makeBusinessSocket = makeBusinessSocket;

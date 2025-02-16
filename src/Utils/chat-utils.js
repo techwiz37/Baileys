@@ -1,4 +1,20 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processSyncAction = exports.chatModificationToAppPatch = exports.decodePatches = exports.decodeSyncdSnapshot = exports.downloadExternalPatch = exports.downloadExternalBlob = exports.extractSyncdPatches = exports.decodeSyncdPatch = exports.decodeSyncdMutations = exports.encodeSyncdPatch = exports.newLTHashState = void 0;
 const boom_1 = require("@hapi/boom");
@@ -46,7 +62,7 @@ const to64BitNetworkOrder = (e) => {
     return buff;
 };
 const makeLtHashGenerator = ({ indexValueMap, hash }) => {
-    indexValueMap = { ...indexValueMap };
+    indexValueMap = Object.assign({}, indexValueMap);
     const addBuffs = [];
     const subBuffs = [];
     return {
@@ -99,13 +115,13 @@ const generatePatchMac = (snapshotMac, valueMacs, version, type, key) => {
 };
 const newLTHashState = () => ({ version: 0, hash: Buffer.alloc(128), indexValueMap: {} });
 exports.newLTHashState = newLTHashState;
-const encodeSyncdPatch = async ({ type, index, syncAction, apiVersion, operation }, myAppStateKeyId, state, getAppStateSyncKey) => {
-    const key = !!myAppStateKeyId ? await getAppStateSyncKey(myAppStateKeyId) : undefined;
+const encodeSyncdPatch = (_a, myAppStateKeyId_1, state_1, getAppStateSyncKey_1) => __awaiter(void 0, [_a, myAppStateKeyId_1, state_1, getAppStateSyncKey_1], void 0, function* ({ type, index, syncAction, apiVersion, operation }, myAppStateKeyId, state, getAppStateSyncKey) {
+    const key = !!myAppStateKeyId ? yield getAppStateSyncKey(myAppStateKeyId) : undefined;
     if (!key) {
         throw new boom_1.Boom(`myAppStateKey ("${myAppStateKeyId}") not present`, { statusCode: 404 });
     }
     const encKeyId = Buffer.from(myAppStateKeyId, 'base64');
-    state = { ...state, indexValueMap: { ...state.indexValueMap } };
+    state = Object.assign(Object.assign({}, state), { indexValueMap: Object.assign({}, state.indexValueMap) });
     const indexBuffer = Buffer.from(JSON.stringify(index));
     const dataProto = WAProto_1.proto.SyncActionData.fromObject({
         index: indexBuffer,
@@ -146,9 +162,9 @@ const encodeSyncdPatch = async ({ type, index, syncAction, apiVersion, operation
     const base64Index = indexMac.toString('base64');
     state.indexValueMap[base64Index] = { valueMac };
     return { patch, state };
-};
+});
 exports.encodeSyncdPatch = encodeSyncdPatch;
-const decodeSyncdMutations = async (msgMutations, initialState, getAppStateSyncKey, onMutation, validateMacs) => {
+const decodeSyncdMutations = (msgMutations, initialState, getAppStateSyncKey, onMutation, validateMacs) => __awaiter(void 0, void 0, void 0, function* () {
     const ltGenerator = makeLtHashGenerator(initialState);
     // indexKey used to HMAC sign record.index.blob
     // valueEncryptionKey used to AES-256-CBC encrypt record.value.blob[0:-32]
@@ -158,7 +174,7 @@ const decodeSyncdMutations = async (msgMutations, initialState, getAppStateSyncK
         // otherwise, if it's only a record -- it'll be a SET mutation
         const operation = 'operation' in msgMutation ? msgMutation.operation : WAProto_1.proto.SyncdMutation.SyncdOperation.SET;
         const record = ('record' in msgMutation && !!msgMutation.record) ? msgMutation.record : msgMutation;
-        const key = await getKey(record.keyId.id);
+        const key = yield getKey(record.keyId.id);
         const content = Buffer.from(record.value.blob);
         const encContent = content.slice(0, -32);
         const ogValueMac = content.slice(-32);
@@ -185,20 +201,22 @@ const decodeSyncdMutations = async (msgMutations, initialState, getAppStateSyncK
         });
     }
     return ltGenerator.finish();
-    async function getKey(keyId) {
-        const base64Key = Buffer.from(keyId).toString('base64');
-        const keyEnc = await getAppStateSyncKey(base64Key);
-        if (!keyEnc) {
-            throw new boom_1.Boom(`failed to find key "${base64Key}" to decode mutation`, { statusCode: 404, data: { msgMutations } });
-        }
-        return mutationKeys(keyEnc.keyData);
+    function getKey(keyId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const base64Key = Buffer.from(keyId).toString('base64');
+            const keyEnc = yield getAppStateSyncKey(base64Key);
+            if (!keyEnc) {
+                throw new boom_1.Boom(`failed to find key "${base64Key}" to decode mutation`, { statusCode: 404, data: { msgMutations } });
+            }
+            return mutationKeys(keyEnc.keyData);
+        });
     }
-};
+});
 exports.decodeSyncdMutations = decodeSyncdMutations;
-const decodeSyncdPatch = async (msg, name, initialState, getAppStateSyncKey, onMutation, validateMacs) => {
+const decodeSyncdPatch = (msg, name, initialState, getAppStateSyncKey, onMutation, validateMacs) => __awaiter(void 0, void 0, void 0, function* () {
     if (validateMacs) {
         const base64Key = Buffer.from(msg.keyId.id).toString('base64');
-        const mainKeyObj = await getAppStateSyncKey(base64Key);
+        const mainKeyObj = yield getAppStateSyncKey(base64Key);
         if (!mainKeyObj) {
             throw new boom_1.Boom(`failed to find key "${base64Key}" to decode patch`, { statusCode: 404, data: { msg } });
         }
@@ -209,15 +227,15 @@ const decodeSyncdPatch = async (msg, name, initialState, getAppStateSyncKey, onM
             throw new boom_1.Boom('Invalid patch mac');
         }
     }
-    const result = await (0, exports.decodeSyncdMutations)(msg.mutations, initialState, getAppStateSyncKey, onMutation, validateMacs);
+    const result = yield (0, exports.decodeSyncdMutations)(msg.mutations, initialState, getAppStateSyncKey, onMutation, validateMacs);
     return result;
-};
+});
 exports.decodeSyncdPatch = decodeSyncdPatch;
-const extractSyncdPatches = async (result, options) => {
+const extractSyncdPatches = (result, options) => __awaiter(void 0, void 0, void 0, function* () {
     const syncNode = (0, WABinary_1.getBinaryNodeChild)(result, 'sync');
     const collectionNodes = (0, WABinary_1.getBinaryNodeChildren)(syncNode, 'collection');
     const final = {};
-    await Promise.all(collectionNodes.map(async (collectionNode) => {
+    yield Promise.all(collectionNodes.map((collectionNode) => __awaiter(void 0, void 0, void 0, function* () {
         const patchesNode = (0, WABinary_1.getBinaryNodeChild)(collectionNode, 'patches');
         const patches = (0, WABinary_1.getBinaryNodeChildren)(patchesNode || collectionNode, 'patch');
         const snapshotNode = (0, WABinary_1.getBinaryNodeChild)(collectionNode, 'snapshot');
@@ -230,7 +248,7 @@ const extractSyncdPatches = async (result, options) => {
                 snapshotNode.content = Buffer.from(Object.values(snapshotNode.content));
             }
             const blobRef = WAProto_1.proto.ExternalBlobReference.decode(snapshotNode.content);
-            const data = await (0, exports.downloadExternalBlob)(blobRef, options);
+            const data = yield (0, exports.downloadExternalBlob)(blobRef, options);
             snapshot = WAProto_1.proto.SyncdSnapshot.decode(data);
         }
         for (let { content } of patches) {
@@ -246,32 +264,45 @@ const extractSyncdPatches = async (result, options) => {
             }
         }
         final[name] = { patches: syncds, hasMorePatches, snapshot };
-    }));
+    })));
     return final;
-};
+});
 exports.extractSyncdPatches = extractSyncdPatches;
-const downloadExternalBlob = async (blob, options) => {
-    const stream = await (0, messages_media_1.downloadContentFromMessage)(blob, 'md-app-state', { options });
+const downloadExternalBlob = (blob, options) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, e_1, _b, _c;
+    const stream = yield (0, messages_media_1.downloadContentFromMessage)(blob, 'md-app-state', { options });
     const bufferArray = [];
-    for await (const chunk of stream) {
-        bufferArray.push(chunk);
+    try {
+        for (var _d = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield stream_1.next(), _a = stream_1_1.done, !_a; _d = true) {
+            _c = stream_1_1.value;
+            _d = false;
+            const chunk = _c;
+            bufferArray.push(chunk);
+        }
+    }
+    catch (e_1_1) { e_1 = { error: e_1_1 }; }
+    finally {
+        try {
+            if (!_d && !_a && (_b = stream_1.return)) yield _b.call(stream_1);
+        }
+        finally { if (e_1) throw e_1.error; }
     }
     return Buffer.concat(bufferArray);
-};
+});
 exports.downloadExternalBlob = downloadExternalBlob;
-const downloadExternalPatch = async (blob, options) => {
-    const buffer = await (0, exports.downloadExternalBlob)(blob, options);
+const downloadExternalPatch = (blob, options) => __awaiter(void 0, void 0, void 0, function* () {
+    const buffer = yield (0, exports.downloadExternalBlob)(blob, options);
     const syncData = WAProto_1.proto.SyncdMutations.decode(buffer);
     return syncData;
-};
+});
 exports.downloadExternalPatch = downloadExternalPatch;
-const decodeSyncdSnapshot = async (name, snapshot, getAppStateSyncKey, minimumVersionNumber, validateMacs = true) => {
+const decodeSyncdSnapshot = (name_1, snapshot_1, getAppStateSyncKey_1, minimumVersionNumber_1, ...args_1) => __awaiter(void 0, [name_1, snapshot_1, getAppStateSyncKey_1, minimumVersionNumber_1, ...args_1], void 0, function* (name, snapshot, getAppStateSyncKey, minimumVersionNumber, validateMacs = true) {
     const newState = (0, exports.newLTHashState)();
     newState.version = (0, generics_1.toNumber)(snapshot.version.version);
     const mutationMap = {};
     const areMutationsRequired = typeof minimumVersionNumber === 'undefined'
         || newState.version > minimumVersionNumber;
-    const { hash, indexValueMap } = await (0, exports.decodeSyncdMutations)(snapshot.records, newState, getAppStateSyncKey, areMutationsRequired
+    const { hash, indexValueMap } = yield (0, exports.decodeSyncdMutations)(snapshot.records, newState, getAppStateSyncKey, areMutationsRequired
         ? (mutation) => {
             var _a;
             const index = (_a = mutation.syncAction.index) === null || _a === void 0 ? void 0 : _a.toString();
@@ -282,7 +313,7 @@ const decodeSyncdSnapshot = async (name, snapshot, getAppStateSyncKey, minimumVe
     newState.indexValueMap = indexValueMap;
     if (validateMacs) {
         const base64Key = Buffer.from(snapshot.keyId.id).toString('base64');
-        const keyEnc = await getAppStateSyncKey(base64Key);
+        const keyEnc = yield getAppStateSyncKey(base64Key);
         if (!keyEnc) {
             throw new boom_1.Boom(`failed to find key "${base64Key}" to decode mutation`);
         }
@@ -296,28 +327,25 @@ const decodeSyncdSnapshot = async (name, snapshot, getAppStateSyncKey, minimumVe
         state: newState,
         mutationMap
     };
-};
+});
 exports.decodeSyncdSnapshot = decodeSyncdSnapshot;
-const decodePatches = async (name, syncds, initial, getAppStateSyncKey, options, minimumVersionNumber, logger, validateMacs = true) => {
+const decodePatches = (name_1, syncds_1, initial_1, getAppStateSyncKey_1, options_1, minimumVersionNumber_1, logger_1, ...args_1) => __awaiter(void 0, [name_1, syncds_1, initial_1, getAppStateSyncKey_1, options_1, minimumVersionNumber_1, logger_1, ...args_1], void 0, function* (name, syncds, initial, getAppStateSyncKey, options, minimumVersionNumber, logger, validateMacs = true) {
     var _a;
-    const newState = {
-        ...initial,
-        indexValueMap: { ...initial.indexValueMap }
-    };
+    const newState = Object.assign(Object.assign({}, initial), { indexValueMap: Object.assign({}, initial.indexValueMap) });
     const mutationMap = {};
     for (let i = 0; i < syncds.length; i++) {
         const syncd = syncds[i];
         const { version, keyId, snapshotMac } = syncd;
         if (syncd.externalMutations) {
             logger === null || logger === void 0 ? void 0 : logger.trace({ name, version }, 'downloading external patch');
-            const ref = await (0, exports.downloadExternalPatch)(syncd.externalMutations, options);
+            const ref = yield (0, exports.downloadExternalPatch)(syncd.externalMutations, options);
             logger === null || logger === void 0 ? void 0 : logger.debug({ name, version, mutations: ref.mutations.length }, 'downloaded external patch');
             (_a = syncd.mutations) === null || _a === void 0 ? void 0 : _a.push(...ref.mutations);
         }
         const patchVersion = (0, generics_1.toNumber)(version.version);
         newState.version = patchVersion;
         const shouldMutate = typeof minimumVersionNumber === 'undefined' || patchVersion > minimumVersionNumber;
-        const decodeResult = await (0, exports.decodeSyncdPatch)(syncd, name, newState, getAppStateSyncKey, shouldMutate
+        const decodeResult = yield (0, exports.decodeSyncdPatch)(syncd, name, newState, getAppStateSyncKey, shouldMutate
             ? mutation => {
                 var _a;
                 const index = (_a = mutation.syncAction.index) === null || _a === void 0 ? void 0 : _a.toString();
@@ -328,7 +356,7 @@ const decodePatches = async (name, syncds, initial, getAppStateSyncKey, options,
         newState.indexValueMap = decodeResult.indexValueMap;
         if (validateMacs) {
             const base64Key = Buffer.from(keyId.id).toString('base64');
-            const keyEnc = await getAppStateSyncKey(base64Key);
+            const keyEnc = yield getAppStateSyncKey(base64Key);
             if (!keyEnc) {
                 throw new boom_1.Boom(`failed to find key "${base64Key}" to decode mutation`);
             }
@@ -342,7 +370,7 @@ const decodePatches = async (name, syncds, initial, getAppStateSyncKey, options,
         syncd.mutations = [];
     }
     return { state: newState, mutationMap };
-};
+});
 exports.decodePatches = decodePatches;
 const chatModificationToAppPatch = (mod, jid) => {
     const OP = WAProto_1.proto.SyncdMutation.SyncdOperation;
@@ -638,7 +666,7 @@ const processSyncAction = (syncAction, ev, me, initialSyncOpts, logger) => {
     else if (action === null || action === void 0 ? void 0 : action.pushNameSetting) {
         const name = (_b = action === null || action === void 0 ? void 0 : action.pushNameSetting) === null || _b === void 0 ? void 0 : _b.name;
         if (name && (me === null || me === void 0 ? void 0 : me.name) !== name) {
-            ev.emit('creds.update', { me: { ...me, name } });
+            ev.emit('creds.update', { me: Object.assign(Object.assign({}, me), { name }) });
         }
     }
     else if (action === null || action === void 0 ? void 0 : action.pinAction) {

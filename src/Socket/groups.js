@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.extractGroupMetadata = exports.makeGroupsSocket = void 0;
 const WAProto_1 = require("../../WAProto");
@@ -9,21 +18,23 @@ const chats_1 = require("./chats");
 const makeGroupsSocket = (config) => {
     const sock = (0, chats_1.makeChatsSocket)(config);
     const { authState, ev, query, upsertMessage } = sock;
-    const groupQuery = async (jid, type, content) => (query({
-        tag: 'iq',
-        attrs: {
-            type,
-            xmlns: 'w:g2',
-            to: jid,
-        },
-        content
-    }));
-    const groupMetadata = async (jid) => {
-        const result = await groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }]);
+    const groupQuery = (jid, type, content) => __awaiter(void 0, void 0, void 0, function* () {
+        return (query({
+            tag: 'iq',
+            attrs: {
+                type,
+                xmlns: 'w:g2',
+                to: jid,
+            },
+            content
+        }));
+    });
+    const groupMetadata = (jid) => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield groupQuery(jid, 'get', [{ tag: 'query', attrs: { request: 'interactive' } }]);
         return (0, exports.extractGroupMetadata)(result);
-    };
-    const groupFetchAllParticipating = async () => {
-        const result = await query({
+    });
+    const groupFetchAllParticipating = () => __awaiter(void 0, void 0, void 0, function* () {
+        const result = yield query({
             tag: 'iq',
             attrs: {
                 to: '@g.us',
@@ -56,21 +67,18 @@ const makeGroupsSocket = (config) => {
         }
         sock.ev.emit('groups.update', Object.values(data));
         return data;
-    };
-    sock.ws.on('CB:ib,,dirty', async (node) => {
+    });
+    sock.ws.on('CB:ib,,dirty', (node) => __awaiter(void 0, void 0, void 0, function* () {
         const { attrs } = (0, WABinary_1.getBinaryNodeChild)(node, 'dirty');
         if (attrs.type !== 'groups') {
             return;
         }
-        await groupFetchAllParticipating();
-        await sock.cleanDirtyBits('groups');
-    });
-    return {
-        ...sock,
-        groupMetadata,
-        groupCreate: async (subject, participants) => {
+        yield groupFetchAllParticipating();
+        yield sock.cleanDirtyBits('groups');
+    }));
+    return Object.assign(Object.assign({}, sock), { groupMetadata, groupCreate: (subject, participants) => __awaiter(void 0, void 0, void 0, function* () {
             const key = (0, Utils_1.generateMessageID)();
-            const result = await groupQuery('@g.us', 'set', [
+            const result = yield groupQuery('@g.us', 'set', [
                 {
                     tag: 'create',
                     attrs: {
@@ -84,9 +92,8 @@ const makeGroupsSocket = (config) => {
                 }
             ]);
             return (0, exports.extractGroupMetadata)(result);
-        },
-        groupLeave: async (id) => {
-            await groupQuery('@g.us', 'set', [
+        }), groupLeave: (id) => __awaiter(void 0, void 0, void 0, function* () {
+            yield groupQuery('@g.us', 'set', [
                 {
                     tag: 'leave',
                     attrs: {},
@@ -95,18 +102,16 @@ const makeGroupsSocket = (config) => {
                     ]
                 }
             ]);
-        },
-        groupUpdateSubject: async (jid, subject) => {
-            await groupQuery(jid, 'set', [
+        }), groupUpdateSubject: (jid, subject) => __awaiter(void 0, void 0, void 0, function* () {
+            yield groupQuery(jid, 'set', [
                 {
                     tag: 'subject',
                     attrs: {},
                     content: Buffer.from(subject, 'utf-8')
                 }
             ]);
-        },
-        groupRequestParticipantsList: async (jid) => {
-            const result = await groupQuery(jid, 'get', [
+        }), groupRequestParticipantsList: (jid) => __awaiter(void 0, void 0, void 0, function* () {
+            const result = yield groupQuery(jid, 'get', [
                 {
                     tag: 'membership_approval_requests',
                     attrs: {}
@@ -115,9 +120,8 @@ const makeGroupsSocket = (config) => {
             const node = (0, WABinary_1.getBinaryNodeChild)(result, 'membership_approval_requests');
             const participants = (0, WABinary_1.getBinaryNodeChildren)(node, 'membership_approval_request');
             return participants.map(v => v.attrs);
-        },
-        groupRequestParticipantsUpdate: async (jid, participants, action) => {
-            const result = await groupQuery(jid, 'set', [{
+        }), groupRequestParticipantsUpdate: (jid, participants, action) => __awaiter(void 0, void 0, void 0, function* () {
+            const result = yield groupQuery(jid, 'set', [{
                     tag: 'membership_requests_action',
                     attrs: {},
                     content: [
@@ -137,9 +141,8 @@ const makeGroupsSocket = (config) => {
             return participantsAffected.map(p => {
                 return { status: p.attrs.error || '200', jid: p.attrs.jid };
             });
-        },
-        groupParticipantsUpdate: async (jid, participants, action) => {
-            const result = await groupQuery(jid, 'set', [
+        }), groupParticipantsUpdate: (jid, participants, action) => __awaiter(void 0, void 0, void 0, function* () {
+            const result = yield groupQuery(jid, 'set', [
                 {
                     tag: action,
                     attrs: {},
@@ -154,58 +157,40 @@ const makeGroupsSocket = (config) => {
             return participantsAffected.map(p => {
                 return { status: p.attrs.error || '200', jid: p.attrs.jid, content: p };
             });
-        },
-        groupUpdateDescription: async (jid, description) => {
+        }), groupUpdateDescription: (jid, description) => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
-            const metadata = await groupMetadata(jid);
+            const metadata = yield groupMetadata(jid);
             const prev = (_a = metadata.descId) !== null && _a !== void 0 ? _a : null;
-            await groupQuery(jid, 'set', [
+            yield groupQuery(jid, 'set', [
                 {
                     tag: 'description',
-                    attrs: {
-                        ...(description ? { id: (0, Utils_1.generateMessageID)() } : { delete: 'true' }),
-                        ...(prev ? { prev } : {})
-                    },
+                    attrs: Object.assign(Object.assign({}, (description ? { id: (0, Utils_1.generateMessageID)() } : { delete: 'true' })), (prev ? { prev } : {})),
                     content: description ? [
                         { tag: 'body', attrs: {}, content: Buffer.from(description, 'utf-8') }
                     ] : undefined
                 }
             ]);
-        },
-        groupInviteCode: async (jid) => {
-            const result = await groupQuery(jid, 'get', [{ tag: 'invite', attrs: {} }]);
+        }), groupInviteCode: (jid) => __awaiter(void 0, void 0, void 0, function* () {
+            const result = yield groupQuery(jid, 'get', [{ tag: 'invite', attrs: {} }]);
             const inviteNode = (0, WABinary_1.getBinaryNodeChild)(result, 'invite');
             return inviteNode === null || inviteNode === void 0 ? void 0 : inviteNode.attrs.code;
-        },
-        groupRevokeInvite: async (jid) => {
-            const result = await groupQuery(jid, 'set', [{ tag: 'invite', attrs: {} }]);
+        }), groupRevokeInvite: (jid) => __awaiter(void 0, void 0, void 0, function* () {
+            const result = yield groupQuery(jid, 'set', [{ tag: 'invite', attrs: {} }]);
             const inviteNode = (0, WABinary_1.getBinaryNodeChild)(result, 'invite');
             return inviteNode === null || inviteNode === void 0 ? void 0 : inviteNode.attrs.code;
-        },
-        groupAcceptInvite: async (code) => {
-            const results = await groupQuery('@g.us', 'set', [{ tag: 'invite', attrs: { code } }]);
+        }), groupAcceptInvite: (code) => __awaiter(void 0, void 0, void 0, function* () {
+            const results = yield groupQuery('@g.us', 'set', [{ tag: 'invite', attrs: { code } }]);
             const result = (0, WABinary_1.getBinaryNodeChild)(results, 'group');
             return result === null || result === void 0 ? void 0 : result.attrs.jid;
-        },
-        /**
-         * revoke a v4 invite for someone
-         * @param groupJid group jid
-         * @param invitedJid jid of person you invited
-         * @returns true if successful
-         */
-        groupRevokeInviteV4: async (groupJid, invitedJid) => {
-            const result = await groupQuery(groupJid, 'set', [{ tag: 'revoke', attrs: {}, content: [{ tag: 'participant', attrs: { jid: invitedJid } }] }]);
-            return !!result;
-        },
+        }), 
         /**
          * accept a GroupInviteMessage
          * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
          * @param inviteMessage the message to accept
          */
-        groupAcceptInviteV4: ev.createBufferedFunction(async (key, inviteMessage) => {
-            var _a;
+        groupAcceptInviteV4: ev.createBufferedFunction((key, inviteMessage) => __awaiter(void 0, void 0, void 0, function* () {
             key = typeof key === 'string' ? { remoteJid: key } : key;
-            const results = await groupQuery(inviteMessage.groupJid, 'set', [{
+            const results = yield groupQuery(inviteMessage.groupJid, 'set', [{
                     tag: 'accept',
                     attrs: {
                         code: inviteMessage.inviteCode,
@@ -232,10 +217,10 @@ const makeGroupsSocket = (config) => {
                 ]);
             }
             // generate the group add message
-            await upsertMessage({
+            yield upsertMessage({
                 key: {
                     remoteJid: inviteMessage.groupJid,
-                    id: (0, Utils_1.generateMessageIDV2)((_a = sock.user) === null || _a === void 0 ? void 0 : _a.id),
+                    id: (0, Utils_1.generateMessageID)(),
                     fromMe: false,
                     participant: key.remoteJid,
                 },
@@ -247,28 +232,21 @@ const makeGroupsSocket = (config) => {
                 messageTimestamp: (0, Utils_1.unixTimestampSeconds)()
             }, 'notify');
             return results.attrs.from;
-        }),
-        groupGetInviteInfo: async (code) => {
-            const results = await groupQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }]);
+        })), groupGetInviteInfo: (code) => __awaiter(void 0, void 0, void 0, function* () {
+            const results = yield groupQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }]);
             return (0, exports.extractGroupMetadata)(results);
-        },
-        groupToggleEphemeral: async (jid, ephemeralExpiration) => {
+        }), groupToggleEphemeral: (jid, ephemeralExpiration) => __awaiter(void 0, void 0, void 0, function* () {
             const content = ephemeralExpiration ?
                 { tag: 'ephemeral', attrs: { expiration: ephemeralExpiration.toString() } } :
                 { tag: 'not_ephemeral', attrs: {} };
-            await groupQuery(jid, 'set', [content]);
-        },
-        groupSettingUpdate: async (jid, setting) => {
-            await groupQuery(jid, 'set', [{ tag: setting, attrs: {} }]);
-        },
-        groupMemberAddMode: async (jid, mode) => {
-            await groupQuery(jid, 'set', [{ tag: 'member_add_mode', attrs: {}, content: mode }]);
-        },
-        groupJoinApprovalMode: async (jid, mode) => {
-            await groupQuery(jid, 'set', [{ tag: 'membership_approval_mode', attrs: {}, content: [{ tag: 'group_join', attrs: { state: mode } }] }]);
-        },
-        groupFetchAllParticipating
-    };
+            yield groupQuery(jid, 'set', [content]);
+        }), groupSettingUpdate: (jid, setting) => __awaiter(void 0, void 0, void 0, function* () {
+            yield groupQuery(jid, 'set', [{ tag: setting, attrs: {} }]);
+        }), groupMemberAddMode: (jid, mode) => __awaiter(void 0, void 0, void 0, function* () {
+            yield groupQuery(jid, 'set', [{ tag: 'member_add_mode', attrs: {}, content: mode }]);
+        }), groupJoinApprovalMode: (jid, mode) => __awaiter(void 0, void 0, void 0, function* () {
+            yield groupQuery(jid, 'set', [{ tag: 'membership_approval_mode', attrs: {}, content: [{ tag: 'group_join', attrs: { state: mode } }] }]);
+        }), groupFetchAllParticipating });
 };
 exports.makeGroupsSocket = makeGroupsSocket;
 const extractGroupMetadata = (result) => {

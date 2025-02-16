@@ -12,7 +12,7 @@ class ObjectRepository {
         return Array.from(this.entityMap.values());
     }
     upsertById(id, entity) {
-        return this.entityMap.set(id, { ...entity });
+        return this.entityMap.set(id, Object.assign({}, entity));
     }
     deleteById(id) {
         return this.entityMap.delete(id);

@@ -1,6 +1,23 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadingNecessaryImages = exports.uploadingNecessaryImagesOfProduct = exports.parseProductNode = exports.toProductNode = exports.parseOrderDetailsNode = exports.parseCollectionsNode = exports.parseCatalogNode = void 0;
+exports.uploadingNecessaryImages = exports.parseProductNode = exports.toProductNode = exports.parseOrderDetailsNode = exports.parseCollectionsNode = exports.parseCatalogNode = void 0;
+exports.uploadingNecessaryImagesOfProduct = uploadingNecessaryImagesOfProduct;
 const boom_1 = require("@hapi/boom");
 const crypto_1 = require("crypto");
 const WABinary_1 = require("../WABinary");
@@ -181,42 +198,53 @@ exports.parseProductNode = parseProductNode;
 /**
  * Uploads images not already uploaded to WA's servers
  */
-async function uploadingNecessaryImagesOfProduct(product, waUploadToServer, timeoutMs = 30000) {
-    product = {
-        ...product,
-        images: product.images ? await (0, exports.uploadingNecessaryImages)(product.images, waUploadToServer, timeoutMs) : product.images
-    };
-    return product;
+function uploadingNecessaryImagesOfProduct(product_1, waUploadToServer_1) {
+    return __awaiter(this, arguments, void 0, function* (product, waUploadToServer, timeoutMs = 30000) {
+        product = Object.assign(Object.assign({}, product), { images: product.images ? yield (0, exports.uploadingNecessaryImages)(product.images, waUploadToServer, timeoutMs) : product.images });
+        return product;
+    });
 }
-exports.uploadingNecessaryImagesOfProduct = uploadingNecessaryImagesOfProduct;
 /**
  * Uploads images not already uploaded to WA's servers
  */
-const uploadingNecessaryImages = async (images, waUploadToServer, timeoutMs = 30000) => {
-    const results = await Promise.all(images.map(async (img) => {
+const uploadingNecessaryImages = (images_1, waUploadToServer_1, ...args_1) => __awaiter(void 0, [images_1, waUploadToServer_1, ...args_1], void 0, function* (images, waUploadToServer, timeoutMs = 30000) {
+    const results = yield Promise.all(images.map((img) => __awaiter(void 0, void 0, void 0, function* () {
+        var _a, e_1, _b, _c;
         if ('url' in img) {
             const url = img.url.toString();
             if (url.includes('.whatsapp.net')) {
                 return { url };
             }
         }
-        const { stream } = await (0, messages_media_1.getStream)(img);
+        const { stream } = yield (0, messages_media_1.getStream)(img);
         const hasher = (0, crypto_1.createHash)('sha256');
         const contentBlocks = [];
-        for await (const block of stream) {
-            hasher.update(block);
-            contentBlocks.push(block);
+        try {
+            for (var _d = true, stream_1 = __asyncValues(stream), stream_1_1; stream_1_1 = yield stream_1.next(), _a = stream_1_1.done, !_a; _d = true) {
+                _c = stream_1_1.value;
+                _d = false;
+                const block = _c;
+                hasher.update(block);
+                contentBlocks.push(block);
+            }
+        }
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (!_d && !_a && (_b = stream_1.return)) yield _b.call(stream_1);
+            }
+            finally { if (e_1) throw e_1.error; }
         }
         const sha = hasher.digest('base64');
-        const { directPath } = await waUploadToServer((0, messages_media_1.toReadable)(Buffer.concat(contentBlocks)), {
+        const { directPath } = yield waUploadToServer((0, messages_media_1.toReadable)(Buffer.concat(contentBlocks)), {
             mediaType: 'product-catalog-image',
             fileEncSha256B64: sha,
             timeoutMs
         });
         return { url: (0, messages_media_1.getUrlFromDirectPath)(directPath) };
-    }));
+    })));
     return results;
-};
+});
 exports.uploadingNecessaryImages = uploadingNecessaryImages;
 const parseImageUrls = (mediaNode) => {
     const imgNode = (0, WABinary_1.getBinaryNodeChild)(mediaNode, 'image');

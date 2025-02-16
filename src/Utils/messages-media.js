@@ -15,20 +15,47 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStatusCodeForMediaRetry = exports.decryptMediaRetryData = exports.decodeMediaRetryNode = exports.encryptMediaRetryRequest = exports.getWAUploadToServer = exports.extensionForMediaMessage = exports.downloadEncryptedContent = exports.downloadContentFromMessage = exports.getUrlFromDirectPath = exports.encryptedStream = exports.prepareStream = exports.getHttpStream = exports.generateThumbnail = exports.getStream = exports.toBuffer = exports.toReadable = exports.getAudioWaveform = exports.getAudioDuration = exports.mediaMessageSHA256B64 = exports.generateProfilePicture = exports.encodeBase64EncodedStringForUpload = exports.extractImageThumb = exports.getMediaKeys = exports.hkdfInfoKey = void 0;
+exports.getStatusCodeForMediaRetry = exports.decryptMediaRetryData = exports.decodeMediaRetryNode = exports.encryptMediaRetryRequest = exports.getWAUploadToServer = exports.downloadEncryptedContent = exports.downloadContentFromMessage = exports.getUrlFromDirectPath = exports.encryptedStream = exports.prepareStream = exports.getHttpStream = exports.getStream = exports.toBuffer = exports.toReadable = exports.mediaMessageSHA256B64 = exports.generateProfilePicture = exports.encodeBase64EncodedStringForUpload = exports.extractImageThumb = exports.hkdfInfoKey = void 0;
+exports.getMediaKeys = getMediaKeys;
+exports.getAudioDuration = getAudioDuration;
+exports.getAudioWaveform = getAudioWaveform;
+exports.generateThumbnail = generateThumbnail;
+exports.extensionForMediaMessage = extensionForMediaMessage;
 const boom_1 = require("@hapi/boom");
-const axios_1 = __importDefault(require("axios"));
 const child_process_1 = require("child_process");
 const Crypto = __importStar(require("crypto"));
 const events_1 = require("events");
@@ -42,18 +69,16 @@ const WABinary_1 = require("../WABinary");
 const crypto_1 = require("./crypto");
 const generics_1 = require("./generics");
 const getTmpFilesDirectory = () => (0, os_1.tmpdir)();
-const getImageProcessingLibrary = async () => {
-    const [_jimp, sharp] = await Promise.all([
-        (async () => {
-            const jimp = await (import('jimp')
-                .catch(() => { }));
+const getImageProcessingLibrary = () => __awaiter(void 0, void 0, void 0, function* () {
+    const [_jimp, sharp] = yield Promise.all([
+        (() => __awaiter(void 0, void 0, void 0, function* () {
+            const jimp = yield (Promise.resolve().then(() => __importStar(require('jimp'))).catch(() => { }));
             return jimp;
-        })(),
-        (async () => {
-            const sharp = await (import('sharp')
-                .catch(() => { }));
+        }))(),
+        (() => __awaiter(void 0, void 0, void 0, function* () {
+            const sharp = yield (Promise.resolve().then(() => __importStar(require('sharp'))).catch(() => { }));
             return sharp;
-        })()
+        }))()
     ]);
     if (sharp) {
         return { sharp };
@@ -63,7 +88,7 @@ const getImageProcessingLibrary = async () => {
         return { jimp };
     }
     throw new boom_1.Boom('No image processing library available');
-};
+});
 const hkdfInfoKey = (type) => {
     const hkdfInfo = Defaults_1.MEDIA_HKDF_KEY_MAPPING[type];
     return `WhatsApp ${hkdfInfo} Keys`;
@@ -85,29 +110,30 @@ function getMediaKeys(buffer, mediaType) {
         macKey: expandedMediaKey.slice(48, 80),
     };
 }
-exports.getMediaKeys = getMediaKeys;
 /** Extracts video thumb using FFMPEG */
-const extractVideoThumb = async (path, destPath, time, size) => new Promise((resolve, reject) => {
-    const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`;
-    (0, child_process_1.exec)(cmd, (err) => {
-        if (err) {
-            reject(err);
-        }
-        else {
-            resolve();
-        }
+const extractVideoThumb = (path, destPath, time, size) => __awaiter(void 0, void 0, void 0, function* () {
+    return new Promise((resolve, reject) => {
+        const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`;
+        (0, child_process_1.exec)(cmd, (err) => {
+            if (err) {
+                reject(err);
+            }
+            else {
+                resolve();
+            }
+        });
     });
 });
-const extractImageThumb = async (bufferOrFilePath, width = 32) => {
+const extractImageThumb = (bufferOrFilePath_1, ...args_1) => __awaiter(void 0, [bufferOrFilePath_1, ...args_1], void 0, function* (bufferOrFilePath, width = 32) {
     var _a, _b;
     if (bufferOrFilePath instanceof stream_1.Readable) {
-        bufferOrFilePath = await (0, exports.toBuffer)(bufferOrFilePath);
+        bufferOrFilePath = yield (0, exports.toBuffer)(bufferOrFilePath);
     }
-    const lib = await getImageProcessingLibrary();
+    const lib = yield getImageProcessingLibrary();
     if ('sharp' in lib && typeof ((_a = lib.sharp) === null || _a === void 0 ? void 0 : _a.default) === 'function') {
         const img = lib.sharp.default(bufferOrFilePath);
-        const dimensions = await img.metadata();
-        const buffer = await img
+        const dimensions = yield img.metadata();
+        const buffer = yield img
             .resize(width)
             .jpeg({ quality: 50 })
             .toBuffer();
@@ -121,12 +147,12 @@ const extractImageThumb = async (bufferOrFilePath, width = 32) => {
     }
     else if ('jimp' in lib && typeof ((_b = lib.jimp) === null || _b === void 0 ? void 0 : _b.read) === 'function') {
         const { read, MIME_JPEG, RESIZE_BILINEAR, AUTO } = lib.jimp;
-        const jimp = await read(bufferOrFilePath);
+        const jimp = yield read(bufferOrFilePath);
         const dimensions = {
             width: jimp.getWidth(),
             height: jimp.getHeight()
         };
-        const buffer = await jimp
+        const buffer = yield jimp
             .quality(50)
             .resize(width, AUTO, RESIZE_BILINEAR)
             .getBufferAsync(MIME_JPEG);
@@ -138,14 +164,14 @@ const extractImageThumb = async (bufferOrFilePath, width = 32) => {
     else {
         throw new boom_1.Boom('No image processing library available');
     }
-};
+});
 exports.extractImageThumb = extractImageThumb;
 const encodeBase64EncodedStringForUpload = (b64) => (encodeURIComponent(b64
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/\=+$/, '')));
 exports.encodeBase64EncodedStringForUpload = encodeBase64EncodedStringForUpload;
-const generateProfilePicture = async (mediaUpload) => {
+const generateProfilePicture = (mediaUpload) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     let bufferOrFilePath;
     if (Buffer.isBuffer(mediaUpload)) {
@@ -155,9 +181,9 @@ const generateProfilePicture = async (mediaUpload) => {
         bufferOrFilePath = mediaUpload.url.toString();
     }
     else {
-        bufferOrFilePath = await (0, exports.toBuffer)(mediaUpload.stream);
+        bufferOrFilePath = yield (0, exports.toBuffer)(mediaUpload.stream);
     }
-    const lib = await getImageProcessingLibrary();
+    const lib = yield getImageProcessingLibrary();
     let img;
     if ('sharp' in lib && typeof ((_a = lib.sharp) === null || _a === void 0 ? void 0 : _a.default) === 'function') {
         img = lib.sharp.default(bufferOrFilePath)
@@ -169,7 +195,7 @@ const generateProfilePicture = async (mediaUpload) => {
     }
     else if ('jimp' in lib && typeof ((_b = lib.jimp) === null || _b === void 0 ? void 0 : _b.read) === 'function') {
         const { read, MIME_JPEG, RESIZE_BILINEAR } = lib.jimp;
-        const jimp = await read(bufferOrFilePath);
+        const jimp = yield read(bufferOrFilePath);
         const min = Math.min(jimp.getWidth(), jimp.getHeight());
         const cropped = jimp.crop(0, 0, min, min);
         img = cropped
@@ -181,9 +207,9 @@ const generateProfilePicture = async (mediaUpload) => {
         throw new boom_1.Boom('No image processing library available');
     }
     return {
-        img: await img,
+        img: yield img,
     };
-};
+});
 exports.generateProfilePicture = generateProfilePicture;
 /** gets the SHA256 of the given media message */
 const mediaMessageSHA256B64 = (message) => {
@@ -191,69 +217,71 @@ const mediaMessageSHA256B64 = (message) => {
     return (media === null || media === void 0 ? void 0 : media.fileSha256) && Buffer.from(media.fileSha256).toString('base64');
 };
 exports.mediaMessageSHA256B64 = mediaMessageSHA256B64;
-async function getAudioDuration(buffer) {
-    const musicMetadata = await import('music-metadata');
-    let metadata;
-    if (Buffer.isBuffer(buffer)) {
-        metadata = await musicMetadata.parseBuffer(buffer, undefined, { duration: true });
-    }
-    else if (typeof buffer === 'string') {
-        const rStream = (0, fs_1.createReadStream)(buffer);
-        try {
-            metadata = await musicMetadata.parseStream(rStream, undefined, { duration: true });
-        }
-        finally {
-            rStream.destroy();
-        }
-    }
-    else {
-        metadata = await musicMetadata.parseStream(buffer, undefined, { duration: true });
-    }
-    return metadata.format.duration;
-}
-exports.getAudioDuration = getAudioDuration;
-/**
-  referenced from and modifying https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/prepareAudioWaveform.ts
- */
-async function getAudioWaveform(buffer, logger) {
-    try {
-        const audioDecode = (buffer) => import('audio-decode').then(({ default: audioDecode }) => audioDecode(buffer));
-        let audioData;
+function getAudioDuration(buffer) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const musicMetadata = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
+        let metadata;
         if (Buffer.isBuffer(buffer)) {
-            audioData = buffer;
+            metadata = yield musicMetadata.parseBuffer(buffer, undefined, { duration: true });
         }
         else if (typeof buffer === 'string') {
             const rStream = (0, fs_1.createReadStream)(buffer);
-            audioData = await (0, exports.toBuffer)(rStream);
+            try {
+                metadata = yield musicMetadata.parseStream(rStream, undefined, { duration: true });
+            }
+            finally {
+                rStream.destroy();
+            }
         }
         else {
-            audioData = await (0, exports.toBuffer)(buffer);
+            metadata = yield musicMetadata.parseStream(buffer, undefined, { duration: true });
         }
-        const audioBuffer = await audioDecode(audioData);
-        const rawData = audioBuffer.getChannelData(0); // We only need to work with one channel of data
-        const samples = 64; // Number of samples we want to have in our final data set
-        const blockSize = Math.floor(rawData.length / samples); // the number of samples in each subdivision
-        const filteredData = [];
-        for (let i = 0; i < samples; i++) {
-            const blockStart = blockSize * i; // the location of the first sample in the block
-            let sum = 0;
-            for (let j = 0; j < blockSize; j++) {
-                sum = sum + Math.abs(rawData[blockStart + j]); // find the sum of all the samples in the block
-            }
-            filteredData.push(sum / blockSize); // divide the sum by the block size to get the average
-        }
-        // This guarantees that the largest data point will be set to 1, and the rest of the data will scale proportionally.
-        const multiplier = Math.pow(Math.max(...filteredData), -1);
-        const normalizedData = filteredData.map((n) => n * multiplier);
-        // Generate waveform like WhatsApp
-        const waveform = new Uint8Array(normalizedData.map((n) => Math.floor(100 * n)));
-        return waveform;
-    }
-    catch (e) {
-        logger === null || logger === void 0 ? void 0 : logger.debug('Failed to generate waveform: ' + e);
-    }
+        return metadata.format.duration;
+    });
 }
-exports.getAudioWaveform = getAudioWaveform;
+/**
+  referenced from and modifying https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/prepareAudioWaveform.ts
+ */
+function getAudioWaveform(buffer, logger) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const audioDecode = (buffer) => Promise.resolve().then(() => __importStar(require('audio-decode'))).then(({ default: audioDecode }) => audioDecode(buffer));
+            let audioData;
+            if (Buffer.isBuffer(buffer)) {
+                audioData = buffer;
+            }
+            else if (typeof buffer === 'string') {
+                const rStream = (0, fs_1.createReadStream)(buffer);
+                audioData = yield (0, exports.toBuffer)(rStream);
+            }
+            else {
+                audioData = yield (0, exports.toBuffer)(buffer);
+            }
+            const audioBuffer = yield audioDecode(audioData);
+            const rawData = audioBuffer.getChannelData(0); // We only need to work with one channel of data
+            const samples = 64; // Number of samples we want to have in our final data set
+            const blockSize = Math.floor(rawData.length / samples); // the number of samples in each subdivision
+            const filteredData = [];
+            for (let i = 0; i < samples; i++) {
+                const blockStart = blockSize * i; // the location of the first sample in the block
+                let sum = 0;
+                for (let j = 0; j < blockSize; j++) {
+                    sum = sum + Math.abs(rawData[blockStart + j]); // find the sum of all the samples in the block
+                }
+                filteredData.push(sum / blockSize); // divide the sum by the block size to get the average
+            }
+            // This guarantees that the largest data point will be set to 1, and the rest of the data will scale proportionally.
+            const multiplier = Math.pow(Math.max(...filteredData), -1);
+            const normalizedData = filteredData.map((n) => n * multiplier);
+            // Generate waveform like WhatsApp
+            const waveform = new Uint8Array(normalizedData.map((n) => Math.floor(100 * n)));
+            return waveform;
+        }
+        catch (e) {
+            logger === null || logger === void 0 ? void 0 : logger.debug('Failed to generate waveform: ' + e);
+        }
+    });
+}
 const toReadable = (buffer) => {
     const readable = new stream_1.Readable({ read: () => { } });
     readable.push(buffer);
@@ -261,16 +289,30 @@ const toReadable = (buffer) => {
     return readable;
 };
 exports.toReadable = toReadable;
-const toBuffer = async (stream) => {
+const toBuffer = (stream) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, stream_2, stream_2_1;
+    var _b, e_1, _c, _d;
     const chunks = [];
-    for await (const chunk of stream) {
-        chunks.push(chunk);
+    try {
+        for (_a = true, stream_2 = __asyncValues(stream); stream_2_1 = yield stream_2.next(), _b = stream_2_1.done, !_b; _a = true) {
+            _d = stream_2_1.value;
+            _a = false;
+            const chunk = _d;
+            chunks.push(chunk);
+        }
+    }
+    catch (e_1_1) { e_1 = { error: e_1_1 }; }
+    finally {
+        try {
+            if (!_a && !_b && (_c = stream_2.return)) yield _c.call(stream_2);
+        }
+        finally { if (e_1) throw e_1.error; }
     }
     stream.destroy();
     return Buffer.concat(chunks);
-};
+});
 exports.toBuffer = toBuffer;
-const getStream = async (item, opts) => {
+const getStream = (item, opts) => __awaiter(void 0, void 0, void 0, function* () {
     if (Buffer.isBuffer(item)) {
         return { stream: (0, exports.toReadable)(item), type: 'buffer' };
     }
@@ -278,56 +320,58 @@ const getStream = async (item, opts) => {
         return { stream: item.stream, type: 'readable' };
     }
     if (item.url.toString().startsWith('http://') || item.url.toString().startsWith('https://')) {
-        return { stream: await (0, exports.getHttpStream)(item.url, opts), type: 'remote' };
+        return { stream: yield (0, exports.getHttpStream)(item.url, opts), type: 'remote' };
     }
     return { stream: (0, fs_1.createReadStream)(item.url), type: 'file' };
-};
+});
 exports.getStream = getStream;
 /** generates a thumbnail for a given media, if required */
-async function generateThumbnail(file, mediaType, options) {
-    var _a;
-    let thumbnail;
-    let originalImageDimensions;
-    if (mediaType === 'image') {
-        const { buffer, original } = await (0, exports.extractImageThumb)(file);
-        thumbnail = buffer.toString('base64');
-        if (original.width && original.height) {
-            originalImageDimensions = {
-                width: original.width,
-                height: original.height,
-            };
+function generateThumbnail(file, mediaType, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        let thumbnail;
+        let originalImageDimensions;
+        if (mediaType === 'image') {
+            const { buffer, original } = yield (0, exports.extractImageThumb)(file);
+            thumbnail = buffer.toString('base64');
+            if (original.width && original.height) {
+                originalImageDimensions = {
+                    width: original.width,
+                    height: original.height,
+                };
+            }
         }
-    }
-    else if (mediaType === 'video') {
-        const imgFilename = (0, path_1.join)(getTmpFilesDirectory(), (0, generics_1.generateMessageID)() + '.jpg');
-        try {
-            await extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 });
-            const buff = await fs_1.promises.readFile(imgFilename);
-            thumbnail = buff.toString('base64');
-            await fs_1.promises.unlink(imgFilename);
+        else if (mediaType === 'video') {
+            const imgFilename = (0, path_1.join)(getTmpFilesDirectory(), (0, generics_1.generateMessageID)() + '.jpg');
+            try {
+                yield extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 });
+                const buff = yield fs_1.promises.readFile(imgFilename);
+                thumbnail = buff.toString('base64');
+                yield fs_1.promises.unlink(imgFilename);
+            }
+            catch (err) {
+                (_a = options.logger) === null || _a === void 0 ? void 0 : _a.debug('could not generate video thumb: ' + err);
+            }
         }
-        catch (err) {
-            (_a = options.logger) === null || _a === void 0 ? void 0 : _a.debug('could not generate video thumb: ' + err);
-        }
-    }
-    return {
-        thumbnail,
-        originalImageDimensions
-    };
+        return {
+            thumbnail,
+            originalImageDimensions
+        };
+    });
 }
-exports.generateThumbnail = generateThumbnail;
-const getHttpStream = async (url, options = {}) => {
-    const fetched = await axios_1.default.get(url.toString(), { ...options, responseType: 'stream' });
+const getHttpStream = (url_1, ...args_1) => __awaiter(void 0, [url_1, ...args_1], void 0, function* (url, options = {}) {
+    const { default: axios } = yield Promise.resolve().then(() => __importStar(require('axios')));
+    const fetched = yield axios.get(url.toString(), Object.assign(Object.assign({}, options), { responseType: 'stream' }));
     return fetched.data;
-};
+});
 exports.getHttpStream = getHttpStream;
-const prepareStream = async (media, mediaType, { logger, saveOriginalFileIfRequired, opts } = {}) => {
-    const { stream, type } = await (0, exports.getStream)(media, opts);
+const prepareStream = (media_1, mediaType_1, ...args_1) => __awaiter(void 0, [media_1, mediaType_1, ...args_1], void 0, function* (media, mediaType, { logger, saveOriginalFileIfRequired, opts } = {}) {
+    const { stream, type } = yield (0, exports.getStream)(media, opts);
     logger === null || logger === void 0 ? void 0 : logger.debug('fetched media stream');
     let bodyPath;
     let didSaveToTmpPath = false;
     try {
-        const buffer = await (0, exports.toBuffer)(stream);
+        const buffer = yield (0, exports.toBuffer)(stream);
         if (type === 'file') {
             bodyPath = media.url;
         }
@@ -355,7 +399,7 @@ const prepareStream = async (media, mediaType, { logger, saveOriginalFileIfRequi
         stream.destroy();
         if (didSaveToTmpPath) {
             try {
-                await fs_1.promises.unlink(bodyPath);
+                yield fs_1.promises.unlink(bodyPath);
             }
             catch (err) {
                 logger === null || logger === void 0 ? void 0 : logger.error({ err }, 'failed to save to tmp path');
@@ -363,10 +407,11 @@ const prepareStream = async (media, mediaType, { logger, saveOriginalFileIfRequi
         }
         throw error;
     }
-};
+});
 exports.prepareStream = prepareStream;
-const encryptedStream = async (media, mediaType, { logger, saveOriginalFileIfRequired, opts } = {}) => {
-    const { stream, type } = await (0, exports.getStream)(media, opts);
+const encryptedStream = (media_1, mediaType_1, ...args_1) => __awaiter(void 0, [media_1, mediaType_1, ...args_1], void 0, function* (media, mediaType, { logger, saveOriginalFileIfRequired, opts } = {}) {
+    var _a, e_2, _b, _c;
+    const { stream, type } = yield (0, exports.getStream)(media, opts);
     logger === null || logger === void 0 ? void 0 : logger.debug('fetched media stream');
     const mediaKey = Crypto.randomBytes(32);
     const { cipherKey, iv, macKey } = getMediaKeys(mediaKey, mediaType);
@@ -388,22 +433,34 @@ const encryptedStream = async (media, mediaType, { logger, saveOriginalFileIfReq
     let sha256Plain = Crypto.createHash('sha256');
     let sha256Enc = Crypto.createHash('sha256');
     try {
-        for await (const data of stream) {
-            fileLength += data.length;
-            if (type === 'remote'
-                && (opts === null || opts === void 0 ? void 0 : opts.maxContentLength)
-                && fileLength + data.length > opts.maxContentLength) {
-                throw new boom_1.Boom(`content length exceeded when encrypting "${type}"`, {
-                    data: { media, type }
-                });
-            }
-            sha256Plain = sha256Plain.update(data);
-            if (writeStream) {
-                if (!writeStream.write(data)) {
-                    await (0, events_1.once)(writeStream, 'drain');
+        try {
+            for (var _d = true, stream_3 = __asyncValues(stream), stream_3_1; stream_3_1 = yield stream_3.next(), _a = stream_3_1.done, !_a; _d = true) {
+                _c = stream_3_1.value;
+                _d = false;
+                const data = _c;
+                fileLength += data.length;
+                if (type === 'remote'
+                    && (opts === null || opts === void 0 ? void 0 : opts.maxContentLength)
+                    && fileLength + data.length > opts.maxContentLength) {
+                    throw new boom_1.Boom(`content length exceeded when encrypting "${type}"`, {
+                        data: { media, type }
+                    });
                 }
+                sha256Plain = sha256Plain.update(data);
+                if (writeStream) {
+                    if (!writeStream.write(data)) {
+                        yield (0, events_1.once)(writeStream, 'drain');
+                    }
+                }
+                onChunk(aes.update(data));
             }
-            onChunk(aes.update(data));
+        }
+        catch (e_2_1) { e_2 = { error: e_2_1 }; }
+        finally {
+            try {
+                if (!_d && !_a && (_b = stream_3.return)) yield _b.call(stream_3);
+            }
+            finally { if (e_2) throw e_2.error; }
         }
         onChunk(aes.final());
         const mac = hmac.digest().slice(0, 10);
@@ -437,7 +494,7 @@ const encryptedStream = async (media, mediaType, { logger, saveOriginalFileIfReq
         stream.destroy();
         if (didSaveToTmpPath) {
             try {
-                await fs_1.promises.unlink(bodyPath);
+                yield fs_1.promises.unlink(bodyPath);
             }
             catch (err) {
                 logger === null || logger === void 0 ? void 0 : logger.error({ err }, 'failed to save to tmp path');
@@ -450,7 +507,7 @@ const encryptedStream = async (media, mediaType, { logger, saveOriginalFileIfReq
         hmac = hmac.update(buff);
         encWriteStream.push(buff);
     }
-};
+});
 exports.encryptedStream = encryptedStream;
 const DEF_HOST = 'mmg.whatsapp.net';
 const AES_CHUNK_SIZE = 16;
@@ -469,7 +526,7 @@ exports.downloadContentFromMessage = downloadContentFromMessage;
  * Decrypts and downloads an AES256-CBC encrypted file given the keys.
  * Assumes the SHA256 of the plaintext is appended to the end of the ciphertext
  * */
-const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startByte, endByte, options } = {}) => {
+const downloadEncryptedContent = (downloadUrl_1, _a, ...args_1) => __awaiter(void 0, [downloadUrl_1, _a, ...args_1], void 0, function* (downloadUrl, { cipherKey, iv }, { startByte, endByte, options } = {}) {
     let bytesFetched = 0;
     let startChunk = 0;
     let firstBlockIsIV = false;
@@ -483,10 +540,7 @@ const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startB
         }
     }
     const endChunk = endByte ? toSmallestChunkSize(endByte || 0) + AES_CHUNK_SIZE : undefined;
-    const headers = {
-        ...(options === null || options === void 0 ? void 0 : options.headers) || {},
-        Origin: Defaults_1.DEFAULT_ORIGIN,
-    };
+    const headers = Object.assign(Object.assign({}, (options === null || options === void 0 ? void 0 : options.headers) || {}), { Origin: Defaults_1.DEFAULT_ORIGIN });
     if (startChunk || endChunk) {
         headers.Range = `bytes=${startChunk}-`;
         if (endChunk) {
@@ -494,12 +548,7 @@ const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startB
         }
     }
     // download the message
-    const fetched = await (0, exports.getHttpStream)(downloadUrl, {
-        ...options || {},
-        headers,
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity,
-    });
+    const fetched = yield (0, exports.getHttpStream)(downloadUrl, Object.assign(Object.assign({}, options || {}), { headers, maxBodyLength: Infinity, maxContentLength: Infinity }));
     let remainingBytes = Buffer.from([]);
     let aes;
     const pushBytes = (bytes, push) => {
@@ -551,7 +600,7 @@ const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startB
         },
     });
     return fetched.pipe(output, { end: true });
-};
+});
 exports.downloadEncryptedContent = downloadEncryptedContent;
 function extensionForMediaMessage(message) {
     const getExtension = (mimetype) => mimetype.split(';')[0].split('/')[1];
@@ -568,18 +617,32 @@ function extensionForMediaMessage(message) {
     }
     return extension;
 }
-exports.extensionForMediaMessage = extensionForMediaMessage;
 const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger, options }, refreshMediaConn) => {
-    return async (stream, { mediaType, fileEncSha256B64, newsletter, timeoutMs }) => {
-        var _a, _b;
+    return (stream_4, _a) => __awaiter(void 0, [stream_4, _a], void 0, function* (stream, { mediaType, fileEncSha256B64, newsletter, timeoutMs }) {
+        var _b, stream_5, stream_5_1;
+        var _c, e_3, _d, _e;
+        var _f, _g;
+        const { default: axios } = yield Promise.resolve().then(() => __importStar(require('axios')));
         // send a query JSON to obtain the url & auth token to upload our media
-        let uploadInfo = await refreshMediaConn(false);
+        let uploadInfo = yield refreshMediaConn(false);
         let urls;
         const hosts = [...customUploadHosts, ...uploadInfo.hosts];
         const chunks = [];
         if (!Buffer.isBuffer(stream)) {
-            for await (const chunk of stream) {
-                chunks.push(chunk);
+            try {
+                for (_b = true, stream_5 = __asyncValues(stream); stream_5_1 = yield stream_5.next(), _c = stream_5_1.done, !_c; _b = true) {
+                    _e = stream_5_1.value;
+                    _b = false;
+                    const chunk = _e;
+                    chunks.push(chunk);
+                }
+            }
+            catch (e_3_1) { e_3 = { error: e_3_1 }; }
+            finally {
+                try {
+                    if (!_b && !_c && (_d = stream_5.return)) yield _d.call(stream_5);
+                }
+                finally { if (e_3) throw e_3.error; }
             }
         }
         const reqBody = Buffer.isBuffer(stream) ? stream : Buffer.concat(chunks);
@@ -597,19 +660,7 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger, options },
                 if (maxContentLengthBytes && reqBody.length > maxContentLengthBytes) {
                     throw new boom_1.Boom(`Body too large for "${hostname}"`, { statusCode: 413 });
                 }
-                const body = await axios_1.default.post(url, reqBody, {
-                    ...options,
-                    headers: {
-                        ...options.headers || {},
-                        'Content-Type': 'application/octet-stream',
-                        'Origin': Defaults_1.DEFAULT_ORIGIN
-                    },
-                    httpsAgent: fetchAgent,
-                    timeout: timeoutMs,
-                    responseType: 'json',
-                    maxBodyLength: Infinity,
-                    maxContentLength: Infinity,
-                });
+                const body = yield axios.post(url, reqBody, Object.assign(Object.assign({}, options), { headers: Object.assign(Object.assign({}, options.headers || {}), { 'Content-Type': 'application/octet-stream', 'Origin': Defaults_1.DEFAULT_ORIGIN }), httpsAgent: fetchAgent, timeout: timeoutMs, responseType: 'json', maxBodyLength: Infinity, maxContentLength: Infinity }));
                 result = body.data;
                 if ((result === null || result === void 0 ? void 0 : result.url) || (result === null || result === void 0 ? void 0 : result.directPath)) {
                     urls = {
@@ -620,15 +671,15 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger, options },
                     break;
                 }
                 else {
-                    uploadInfo = await refreshMediaConn(true);
+                    uploadInfo = yield refreshMediaConn(true);
                     throw new Error(`upload failed, reason: ${JSON.stringify(result)}`);
                 }
             }
             catch (error) {
-                if (axios_1.default.isAxiosError(error)) {
-                    result = (_a = error.response) === null || _a === void 0 ? void 0 : _a.data;
+                if (axios.isAxiosError(error)) {
+                    result = (_f = error.response) === null || _f === void 0 ? void 0 : _f.data;
                 }
-                const isLast = hostname === ((_b = hosts[uploadInfo.hosts.length - 1]) === null || _b === void 0 ? void 0 : _b.hostname);
+                const isLast = hostname === ((_g = hosts[uploadInfo.hosts.length - 1]) === null || _g === void 0 ? void 0 : _g.hostname);
                 logger.warn({ trace: error.stack, uploadResult: result }, `Error in uploading to ${hostname} ${isLast ? '' : ', retrying...'}`);
             }
         }
@@ -636,7 +687,7 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger, options },
             throw new boom_1.Boom('Media upload failed on all hosts', { statusCode: 500 });
         }
         return urls;
-    };
+    });
 };
 exports.getWAUploadToServer = getWAUploadToServer;
 const getMediaRetryKey = (mediaKey) => {

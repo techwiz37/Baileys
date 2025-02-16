@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -99,16 +108,16 @@ const makeEventBuffer = (logger) => {
         buffer,
         flush,
         createBufferedFunction(work) {
-            return async (...args) => {
+            return (...args) => __awaiter(this, void 0, void 0, function* () {
                 buffer();
                 try {
-                    const result = await work(...args);
+                    const result = yield work(...args);
                     return result;
                 }
                 finally {
                     flush();
                 }
-            };
+            });
         },
         on: (...args) => ev.on(...args),
         off: (...args) => ev.off(...args),
@@ -504,7 +513,7 @@ function concatChats(a, b) {
         }
     }
     if (typeof a.unreadCount === 'number' && typeof b.unreadCount === 'number') {
-        b = { ...b };
+        b = Object.assign({}, b);
         if (b.unreadCount >= 0) {
             b.unreadCount = Math.max(b.unreadCount, 0) + Math.max(a.unreadCount, 0);
         }

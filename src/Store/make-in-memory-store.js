@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -56,14 +65,6 @@ exports.default = (config) => {
             labels.upsertById(label.id, label);
         }
     };
-    const getValidContacts = () => {
-        for (const contact of Object.keys(contacts)) {
-            if (contact.indexOf('@') < 0) {
-                delete contacts[contact];
-            }
-        }
-        return Object.keys(contacts);
-    };
     /**
      * binds to a BaileysEventEmitter.
      * It listens to all events and constructs a state that you can query accurate data from.
@@ -100,7 +101,7 @@ exports.default = (config) => {
         ev.on('contacts.upsert', contacts => {
             contactsUpsert(contacts);
         });
-        ev.on('contacts.update', async (updates) => {
+        ev.on('contacts.update', (updates) => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
             for (const update of updates) {
                 let contact;
@@ -108,27 +109,26 @@ exports.default = (config) => {
                     contact = contacts[update.id];
                 }
                 else {
-                    const validContacts = getValidContacts();
-                    const contactHashes = validContacts.map((contactId) => {
+                    const contactHashes = yield Promise.all(Object.keys(contacts).map((contactId) => __awaiter(void 0, void 0, void 0, function* () {
                         const { user } = (0, WABinary_1.jidDecode)(contactId);
-                        return [contactId, ((0, Utils_1.md5)(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8'))).toString('base64').slice(0, 3)];
-                    });
+                        return [contactId, (yield (0, Utils_1.md5)(Buffer.from(user + 'WA_ADD_NOTIF', 'utf8'))).toString('base64').slice(0, 3)];
+                    })));
                     contact = contacts[((_a = contactHashes.find(([, b]) => b === update.id)) === null || _a === void 0 ? void 0 : _a[0]) || '']; // find contact by attrs.hash, when user is not saved as a contact
                 }
                 if (contact) {
                     if (update.imgUrl === 'changed') {
-                        contact.imgUrl = socket ? await (socket === null || socket === void 0 ? void 0 : socket.profilePictureUrl(contact.id)) : undefined;
+                        contact.imgUrl = socket ? yield (socket === null || socket === void 0 ? void 0 : socket.profilePictureUrl(contact.id)) : undefined;
                     }
                     else if (update.imgUrl === 'removed') {
                         delete contact.imgUrl;
                     }
-                    Object.assign(contacts[contact.id], contact);
                 }
                 else {
-                    logger.debug({ update }, 'got update for non-existant contact');
+                    return logger.debug({ update }, 'got update for non-existant contact');
                 }
+                Object.assign(contacts[contact.id], contact);
             }
-        });
+        }));
         ev.on('chats.upsert', newChats => {
             chats.upsert(...newChats);
         });
@@ -136,7 +136,7 @@ exports.default = (config) => {
             for (let update of updates) {
                 const result = chats.update(update.id, chat => {
                     if (update.unreadCount > 0) {
-                        update = { ...update };
+                        update = Object.assign({}, update);
                         update.unreadCount = (chat.unreadCount || 0) + update.unreadCount;
                     }
                     Object.assign(chat, update);
@@ -315,7 +315,7 @@ exports.default = (config) => {
         labelAssociations,
         bind,
         /** loads messages from the store, if not found -- uses the legacy connection */
-        loadMessages: async (jid, count, cursor) => {
+        loadMessages: (jid, count, cursor) => __awaiter(void 0, void 0, void 0, function* () {
             const list = assertMessageList(jid);
             const mode = !cursor || 'before' in cursor ? 'before' : 'after';
             const cursorKey = !!cursor ? ('before' in cursor ? cursor.before : cursor.after) : undefined;
@@ -338,7 +338,7 @@ exports.default = (config) => {
                 messages = [];
             }
             return messages;
-        },
+        }),
         /**
          * Get all available labels for profile
          *
@@ -367,31 +367,31 @@ exports.default = (config) => {
                 .all();
             return associations.map(({ labelId }) => labelId);
         },
-        loadMessage: async (jid, id) => { var _a; return (_a = messages[jid]) === null || _a === void 0 ? void 0 : _a.get(id); },
-        mostRecentMessage: async (jid) => {
+        loadMessage: (jid, id) => __awaiter(void 0, void 0, void 0, function* () { var _a; return (_a = messages[jid]) === null || _a === void 0 ? void 0 : _a.get(id); }),
+        mostRecentMessage: (jid) => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
             const message = (_a = messages[jid]) === null || _a === void 0 ? void 0 : _a.array.slice(-1)[0];
             return message;
-        },
-        fetchImageUrl: async (jid, sock) => {
+        }),
+        fetchImageUrl: (jid, sock) => __awaiter(void 0, void 0, void 0, function* () {
             const contact = contacts[jid];
             if (!contact) {
                 return sock === null || sock === void 0 ? void 0 : sock.profilePictureUrl(jid);
             }
             if (typeof contact.imgUrl === 'undefined') {
-                contact.imgUrl = await (sock === null || sock === void 0 ? void 0 : sock.profilePictureUrl(jid));
+                contact.imgUrl = yield (sock === null || sock === void 0 ? void 0 : sock.profilePictureUrl(jid));
             }
             return contact.imgUrl;
-        },
-        fetchGroupMetadata: async (jid, sock) => {
+        }),
+        fetchGroupMetadata: (jid, sock) => __awaiter(void 0, void 0, void 0, function* () {
             if (!groupMetadata[jid]) {
-                const metadata = await (sock === null || sock === void 0 ? void 0 : sock.groupMetadata(jid));
+                const metadata = yield (sock === null || sock === void 0 ? void 0 : sock.groupMetadata(jid));
                 if (metadata) {
                     groupMetadata[jid] = metadata;
                 }
             }
             return groupMetadata[jid];
-        },
+        }),
         // fetchBroadcastListInfo: async(jid: string, sock: WASocket | undefined) => {
         // 	if(!groupMetadata[jid]) {
         // 		const metadata = await sock?.getBroadcastListInfo(jid)
@@ -401,11 +401,11 @@ exports.default = (config) => {
         // 	}
         // 	return groupMetadata[jid]
         // },
-        fetchMessageReceipts: async ({ remoteJid, id }) => {
+        fetchMessageReceipts: (_a) => __awaiter(void 0, [_a], void 0, function* ({ remoteJid, id }) {
             const list = messages[remoteJid];
             const msg = list === null || list === void 0 ? void 0 : list.get(id);
             return msg === null || msg === void 0 ? void 0 : msg.userReceipt;
-        },
+        }),
         toJSON,
         fromJSON,
         writeToFile: (path) => {

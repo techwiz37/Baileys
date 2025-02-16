@@ -1,3 +1,3 @@
 ```
-Baileys V2 Fixed Button
+Baileys Beta - Fixed Button
 ```

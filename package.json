@@ -1,18 +1,15 @@
 {
   "name": "baileys",
   "version": "6.7.13",
-  "description": "WhatsApp API",
+  "description": "Baileys beta, fixed button", 
   "keywords": [
     "whatsapp",
     "js-whatsapp",
     "whatsapp-api",
     "whatsapp-web",
-    "whatsapp-chat",
-    "whatsapp-group",
-    "automation",
     "multi-device",
     "amiruldev",
-    "techwiz"
+    "techwiz37"
   ],
   "homepage": "https://github.com/techwiz37/Baileys",
   "repository": {
@@ -44,23 +41,20 @@
     "release": "release-it",
     "test": "jest"
   },
-"dependencies": {
+  "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@hapi/boom": "^9.1.3",
-    "async-lock": "^1.4.1",
     "audio-decode": "^2.1.3",
-    "axios": "^1.6.0",
-    "child_process": "^1.0.2",
+    "axios": "^1.3.3",
     "cache-manager": "4.0.1",
     "futoin-hkdf": "^1.5.1",
     "libphonenumber-js": "^1.10.20",
-    "libsignal": "github:nstar-y/libsignal",
-    "lodash": "^4.17.21",
+    "libsignal": "github:signal-node",
     "music-metadata": "^7.12.3",
     "node-cache": "^5.1.2",
     "pino": "^7.0.0",
-    "protobufjs": "^6.11.3",
-    "uuid": "^10.0.0",
+    "protobufjs": "^7.2.4",
+    "uuid": "^9.0.0",
     "ws": "^8.13.0"
   },
   "devDependencies": {
@@ -74,22 +68,22 @@
     "eslint": "^8.0.0",
     "jest": "^27.0.6",
     "jimp": "^0.16.1",
-    "json": "^11.0.0",
-    "link-preview-js": "^3.0.5",
+    "link-preview-js": "^3.0.0",
     "open": "^8.4.2",
     "qrcode-terminal": "^0.12.0",
     "release-it": "^15.10.3",
-    "sharp": "^0.32.6",
+    "sharp": "^0.30.5",
     "ts-jest": "^27.0.3",
     "ts-node": "^10.8.1",
     "typedoc": "^0.24.7",
-    "typescript": "^4.6.4"
+    "typescript": "^4.6.4",
+    "json": "^11.0.0"
   },
   "peerDependencies": {
     "jimp": "^0.16.1",
     "link-preview-js": "^3.0.0",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.32.6"
+    "sharp": "^0.32.2"
   },
   "peerDependenciesMeta": {
     "jimp": {
@@ -105,11 +99,5 @@
       "optional": true
     }
   },
-  "packageManager": "yarn@1.22.19",
-  "directories": {
-    "lib": "lib"
-  },
-  "bugs": {
-    "url": "https://github.com/techwiz37/Baileys/issues"
-  }
+  "packageManager": "yarn@1.22.19"
 }

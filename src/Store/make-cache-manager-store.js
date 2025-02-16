@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,19 +16,19 @@ const cache_manager_1 = require("cache-manager");
 const WAProto_1 = require("../../WAProto");
 const Utils_1 = require("../Utils");
 const logger_1 = __importDefault(require("../Utils/logger"));
-const makeCacheManagerAuthState = async (store, sessionKey) => {
+const makeCacheManagerAuthState = (store, sessionKey) => __awaiter(void 0, void 0, void 0, function* () {
     const defaultKey = (file) => `${sessionKey}:${file}`;
-    const databaseConn = await (0, cache_manager_1.caching)(store);
-    const writeData = async (file, data) => {
+    const databaseConn = yield (0, cache_manager_1.caching)(store);
+    const writeData = (file, data) => __awaiter(void 0, void 0, void 0, function* () {
         let ttl = undefined;
         if (file === 'creds') {
             ttl = 63115200; // 2 years
         }
-        await databaseConn.set(defaultKey(file), JSON.stringify(data, Utils_1.BufferJSON.replacer), ttl);
-    };
-    const readData = async (file) => {
+        yield databaseConn.set(defaultKey(file), JSON.stringify(data, Utils_1.BufferJSON.replacer), ttl);
+    });
+    const readData = (file) => __awaiter(void 0, void 0, void 0, function* () {
         try {
-            const data = await databaseConn.get(defaultKey(file));
+            const data = yield databaseConn.get(defaultKey(file));
             if (data) {
                 return JSON.parse(data, Utils_1.BufferJSON.reviver);
             }
@@ -29,42 +38,42 @@ const makeCacheManagerAuthState = async (store, sessionKey) => {
             logger_1.default.error(error);
             return null;
         }
-    };
-    const removeData = async (file) => {
+    });
+    const removeData = (file) => __awaiter(void 0, void 0, void 0, function* () {
         try {
-            return await databaseConn.del(defaultKey(file));
+            return yield databaseConn.del(defaultKey(file));
         }
         catch (_a) {
             logger_1.default.error(`Error removing ${file} from session ${sessionKey}`);
         }
-    };
-    const clearState = async () => {
+    });
+    const clearState = () => __awaiter(void 0, void 0, void 0, function* () {
         try {
-            const result = await databaseConn.store.keys(`${sessionKey}*`);
-            await Promise.all(result.map(async (key) => await databaseConn.del(key)));
+            const result = yield databaseConn.store.keys(`${sessionKey}*`);
+            yield Promise.all(result.map((key) => __awaiter(void 0, void 0, void 0, function* () { return yield databaseConn.del(key); })));
         }
         catch (err) {
         }
-    };
-    const creds = (await readData('creds')) || (0, Utils_1.initAuthCreds)();
+    });
+    const creds = (yield readData('creds')) || (0, Utils_1.initAuthCreds)();
     return {
         clearState,
         saveCreds: () => writeData('creds', creds),
         state: {
             creds,
             keys: {
-                get: async (type, ids) => {
+                get: (type, ids) => __awaiter(void 0, void 0, void 0, function* () {
                     const data = {};
-                    await Promise.all(ids.map(async (id) => {
-                        let value = await readData(`${type}-${id}`);
+                    yield Promise.all(ids.map((id) => __awaiter(void 0, void 0, void 0, function* () {
+                        let value = yield readData(`${type}-${id}`);
                         if (type === 'app-state-sync-key' && value) {
                             value = WAProto_1.proto.Message.AppStateSyncKeyData.fromObject(value);
                         }
                         data[id] = value;
-                    }));
+                    })));
                     return data;
-                },
-                set: async (data) => {
+                }),
+                set: (data) => __awaiter(void 0, void 0, void 0, function* () {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const tasks = [];
                     for (const category in data) {
@@ -74,10 +83,10 @@ const makeCacheManagerAuthState = async (store, sessionKey) => {
                             tasks.push(value ? writeData(key, value) : removeData(key));
                         }
                     }
-                    await Promise.all(tasks);
-                },
+                    yield Promise.all(tasks);
+                }),
             }
         }
     };
-};
+});
 exports.default = makeCacheManagerAuthState;

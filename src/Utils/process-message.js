@@ -1,6 +1,16 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.decryptPollVote = exports.getChatId = exports.shouldIncrementChatUnread = exports.isRealMessage = exports.cleanMessage = void 0;
+exports.getChatId = exports.shouldIncrementChatUnread = exports.isRealMessage = exports.cleanMessage = void 0;
+exports.decryptPollVote = decryptPollVote;
 const WAProto_1 = require("../../WAProto");
 const Types_1 = require("../Types");
 const messages_1 = require("../Utils/messages");
@@ -101,9 +111,8 @@ function decryptPollVote({ encPayload, encIv }, { pollCreatorJid, pollMsgId, pol
         return Buffer.from(txt);
     }
 }
-exports.decryptPollVote = decryptPollVote;
-const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, keyStore, logger, options, getMessage }) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+const processMessage = (message_1, _a) => __awaiter(void 0, [message_1, _a], void 0, function* (message, { shouldProcessHistoryMsg, ev, creds, keyStore, logger, options, getMessage }) {
+    var _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     const meId = creds.me.id;
     const { accountSettings } = creds;
     const chat = { id: (0, WABinary_1.jidNormalizedUser)((0, exports.getChatId)(message.key)) };
@@ -118,7 +127,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
     const content = (0, messages_1.normalizeMessageContent)(message.message);
     // unarchive chat if it's a real message, or someone reacted to our message
     // and we've the unarchive chats setting on
-    if ((isRealMsg || ((_b = (_a = content === null || content === void 0 ? void 0 : content.reactionMessage) === null || _a === void 0 ? void 0 : _a.key) === null || _b === void 0 ? void 0 : _b.fromMe))
+    if ((isRealMsg || ((_c = (_b = content === null || content === void 0 ? void 0 : content.reactionMessage) === null || _b === void 0 ? void 0 : _b.key) === null || _c === void 0 ? void 0 : _c.fromMe))
         && (accountSettings === null || accountSettings === void 0 ? void 0 : accountSettings.unarchiveChats)) {
         chat.archived = false;
         chat.readOnly = false;
@@ -129,7 +138,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
             case WAProto_1.proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
                 const histNotification = protocolMsg.historySyncNotification;
                 const process = shouldProcessHistoryMsg;
-                const isLatest = !((_c = creds.processedHistoryMessages) === null || _c === void 0 ? void 0 : _c.length);
+                const isLatest = !((_d = creds.processedHistoryMessages) === null || _d === void 0 ? void 0 : _d.length);
                 logger === null || logger === void 0 ? void 0 : logger.info({
                     histNotification,
                     process,
@@ -143,24 +152,24 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
                             { key: message.key, messageTimestamp: message.messageTimestamp }
                         ]
                     });
-                    const data = await (0, history_1.downloadAndProcessHistorySyncNotification)(histNotification, options);
-                    ev.emit('messaging-history.set', { ...data, isLatest });
+                    const data = yield (0, history_1.downloadAndProcessHistorySyncNotification)(histNotification, options);
+                    ev.emit('messaging-history.set', Object.assign(Object.assign({}, data), { isLatest }));
                 }
                 break;
             case WAProto_1.proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE:
                 const keys = protocolMsg.appStateSyncKeyShare.keys;
                 if (keys === null || keys === void 0 ? void 0 : keys.length) {
                     let newAppStateSyncKeyId = '';
-                    await keyStore.transaction(async () => {
+                    yield keyStore.transaction(() => __awaiter(void 0, void 0, void 0, function* () {
                         const newKeys = [];
                         for (const { keyData, keyId } of keys) {
                             const strKeyId = Buffer.from(keyId.keyId).toString('base64');
                             newKeys.push(strKeyId);
-                            await keyStore.set({ 'app-state-sync-key': { [strKeyId]: keyData } });
+                            yield keyStore.set({ 'app-state-sync-key': { [strKeyId]: keyData } });
                             newAppStateSyncKeyId = strKeyId;
                         }
                         logger === null || logger === void 0 ? void 0 : logger.info({ newAppStateSyncKeyId, newKeys }, 'injecting new app state sync keys');
-                    });
+                    }));
                     ev.emit('creds.update', { myAppStateKeyId: newAppStateSyncKeyId });
                 }
                 else {
@@ -170,10 +179,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
             case WAProto_1.proto.Message.ProtocolMessage.Type.REVOKE:
                 ev.emit('messages.update', [
                     {
-                        key: {
-                            ...message.key,
-                            id: protocolMsg.key.id
-                        },
+                        key: Object.assign(Object.assign({}, message.key), { id: protocolMsg.key.id }),
                         update: { message: null, messageStubType: Types_1.WAMessageStubType.REVOKE, key: message.key }
                     }
                 ]);
@@ -202,10 +208,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
         }
     }
     else if (content === null || content === void 0 ? void 0 : content.reactionMessage) {
-        const reaction = {
-            ...content.reactionMessage,
-            key: message.key,
-        };
+        const reaction = Object.assign(Object.assign({}, content.reactionMessage), { key: message.key });
         ev.emit('messages.reaction', [{
                 reaction,
                 key: content.reactionMessage.key,
@@ -218,17 +221,10 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
         const emitParticipantsUpdate = (action) => (ev.emit('group-participants.update', { id: jid, author: message.participant, participants, action }));
         const emitGroupUpdate = (update) => {
             var _a;
-            ev.emit('groups.update', [{ id: jid, ...update, author: (_a = message.participant) !== null && _a !== void 0 ? _a : undefined }]);
-        };
-        const emitGroupRequestJoin = (participant, action, method) => {
-            ev.emit('group.join-request', { id: jid, author: message.participant, participant, action, method: method });
+            ev.emit('groups.update', [Object.assign(Object.assign({ id: jid }, update), { author: (_a = message.participant) !== null && _a !== void 0 ? _a : undefined })]);
         };
         const participantsIncludesMe = () => participants.find(jid => (0, WABinary_1.areJidsSameUser)(meId, jid));
         switch (message.messageStubType) {
-            case Types_1.WAMessageStubType.GROUP_PARTICIPANT_CHANGE_NUMBER:
-                participants = message.messageStubParameters || [];
-                emitParticipantsUpdate('modify');
-                break;
             case Types_1.WAMessageStubType.GROUP_PARTICIPANT_LEAVE:
             case Types_1.WAMessageStubType.GROUP_PARTICIPANT_REMOVE:
                 participants = message.messageStubParameters || [];
@@ -256,47 +252,41 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
                 emitParticipantsUpdate('promote');
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_ANNOUNCE:
-                const announceValue = (_d = message.messageStubParameters) === null || _d === void 0 ? void 0 : _d[0];
+                const announceValue = (_e = message.messageStubParameters) === null || _e === void 0 ? void 0 : _e[0];
                 emitGroupUpdate({ announce: announceValue === 'true' || announceValue === 'on' });
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_RESTRICT:
-                const restrictValue = (_e = message.messageStubParameters) === null || _e === void 0 ? void 0 : _e[0];
+                const restrictValue = (_f = message.messageStubParameters) === null || _f === void 0 ? void 0 : _f[0];
                 emitGroupUpdate({ restrict: restrictValue === 'true' || restrictValue === 'on' });
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_SUBJECT:
-                const name = (_f = message.messageStubParameters) === null || _f === void 0 ? void 0 : _f[0];
+                const name = (_g = message.messageStubParameters) === null || _g === void 0 ? void 0 : _g[0];
                 chat.name = name;
                 emitGroupUpdate({ subject: name });
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_INVITE_LINK:
-                const code = (_g = message.messageStubParameters) === null || _g === void 0 ? void 0 : _g[0];
+                const code = (_h = message.messageStubParameters) === null || _h === void 0 ? void 0 : _h[0];
                 emitGroupUpdate({ inviteCode: code });
                 break;
             case Types_1.WAMessageStubType.GROUP_MEMBER_ADD_MODE:
-                const memberAddValue = (_h = message.messageStubParameters) === null || _h === void 0 ? void 0 : _h[0];
+                const memberAddValue = (_j = message.messageStubParameters) === null || _j === void 0 ? void 0 : _j[0];
                 emitGroupUpdate({ memberAddMode: memberAddValue === 'all_member_add' });
                 break;
             case Types_1.WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_MODE:
-                const approvalMode = (_j = message.messageStubParameters) === null || _j === void 0 ? void 0 : _j[0];
+                const approvalMode = (_k = message.messageStubParameters) === null || _k === void 0 ? void 0 : _k[0];
                 emitGroupUpdate({ joinApprovalMode: approvalMode === 'on' });
-                break;
-            case Types_1.WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_REQUEST_NON_ADMIN_ADD:
-                const participant = (_k = message.messageStubParameters) === null || _k === void 0 ? void 0 : _k[0];
-                const action = (_l = message.messageStubParameters) === null || _l === void 0 ? void 0 : _l[1];
-                const method = (_m = message.messageStubParameters) === null || _m === void 0 ? void 0 : _m[2];
-                emitGroupRequestJoin(participant, action, method);
                 break;
         }
     }
     else if (content === null || content === void 0 ? void 0 : content.pollUpdateMessage) {
         const creationMsgKey = content.pollUpdateMessage.pollCreationMessageKey;
         // we need to fetch the poll creation message to get the poll enc key
-        const pollMsg = await getMessage(creationMsgKey);
+        const pollMsg = yield getMessage(creationMsgKey);
         if (pollMsg) {
             const meIdNormalised = (0, WABinary_1.jidNormalizedUser)(meId);
             const pollCreatorJid = (0, generics_1.getKeyAuthor)(creationMsgKey, meIdNormalised);
             const voterJid = (0, generics_1.getKeyAuthor)(message.key, meIdNormalised);
-            const pollEncKey = (_o = pollMsg.messageContextInfo) === null || _o === void 0 ? void 0 : _o.messageSecret;
+            const pollEncKey = (_l = pollMsg.messageContextInfo) === null || _l === void 0 ? void 0 : _l.messageSecret;
             try {
                 const voteMsg = decryptPollVote(content.pollUpdateMessage.vote, {
                     pollEncKey,
@@ -330,5 +320,5 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
     if (Object.keys(chat).length > 1) {
         ev.emit('chats.update', [chat]);
     }
-};
+});
 exports.default = processMessage;
