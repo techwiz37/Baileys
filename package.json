@@ -1,14 +1,13 @@
 {
   "name": "baileys",
   "version": "6.7.9",
-  "description": "Whatsapp api baileys", 
+  "description": "WhatsApp API", 
   "keywords": [
     "whatsapp",
     "js-whatsapp",
     "whatsapp-api",
     "whatsapp-web",
-    "multi-device",
-    "md"
+    "multi-device"
   ],
   "homepage": "https://github.com/WhiskeySockets/Baileys",
   "repository": {
