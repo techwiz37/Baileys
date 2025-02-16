@@ -207,11 +207,11 @@ const generateMessageIDV2 = (userId) => {
     const random = (0, crypto_1.randomBytes)(16);
     random.copy(data, 28);
     const hash = (0, crypto_1.createHash)('sha256').update(data).digest();
-    return 'ASS' + hash.toString('hex').toUpperCase().substring(0, 18);
+    return crypto_1.randomBytes(16).toString('hex').toUpperCase();
 };
 exports.generateMessageIDV2 = generateMessageIDV2;
 // generate a random ID to attach to a message
-const generateMessageID = () => 'SSA' + (0, crypto_1.randomBytes)(6).toString('hex').toUpperCase();
+const generateMessageID = () => randomBytes(16).toString('hex').toUpperCase();
 exports.generateMessageID = generateMessageID;
 function bindWaitForEvent(ev, event) {
     return (check, timeoutMs) => __awaiter(this, void 0, void 0, function* () {
