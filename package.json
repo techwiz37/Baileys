@@ -44,6 +44,7 @@
     "@whiskeysockets/eslint-config": "github:whiskeysockets/eslint-config",
     "async-mutex": "^0.5.0",
     "axios": "^1.6.0",
+    "cheerio": "^1.0.0",
     "libsignal": "github:techwiz37/signal-node",
     "lodash": "^4.17.21",
     "link-preview-js": "^3.0.0",
