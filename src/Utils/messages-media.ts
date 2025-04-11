@@ -448,11 +448,13 @@ export async function generateThumbnail(
 		const imgFilename = join(getTmpFilesDirectory(), generateMessageID() + '.jpg')
 		try {
 			const thumbnailBuffer: Buffer = await extractVideoThumbOnline(file)
-			//thumbnail = thumbnailBuffer.toString('base64')
-			//originalImageDimensions = { width: 32, height: 32 }
-			await extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 })
+			await fs.writeFile(imgFilename, thumbnailBuffer)
 			const buff = await fs.readFile(imgFilename)
 			thumbnail = buff.toString('base64')
+			//originalImageDimensions = { width: 32, height: 32 }
+			//await extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 })
+			//const buff = await fs.readFile(imgFilename)
+			//thumbnail = buff.toString('base64')
 
 			console.log("buff ", buff)
 			console.log(" thumv ", thumbnail)
