@@ -166,7 +166,7 @@ export async function vid2jpg(videoUrl: string): Promise<string> {
 			throw new Error('Could not find the output JPG image URL on ezgifcom after conversion')
 		}
 		console.log(`VID2JPG: Found image URL: ${link}`)
-		return 'https://'+link
+		return 'https:'+link
 
 	} catch (error: any) {
 		console.error("Error during vid2jpg processing:", error)
