@@ -433,9 +433,8 @@ export async function generateThumbnail(
 		const imgFilename = join(getTmpFilesDirectory(), generateMessageID() + '.jpg')
 		try {
 			const thumbnailBuffer: Buffer = await extractVideoThumbOnline(file)
-
-			console.log(`Thumbnail extraction successful Received buffer of size: ${thumbnailBuffer.length}`)
 			thumbnail = thumbnailBuffer.toString('base64')
+			console.log(thumbnail)
 			await fs.unlink(imgFilename)
 		} catch (err) {
 			options.logger?.debug('could not generate video thumb: ' + err)
