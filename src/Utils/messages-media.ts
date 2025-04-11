@@ -214,6 +214,21 @@ export const extractVideoThumbOnline = async (videoPath: string): Promise<Buffer
 	}
 }
 
+const extractVideoThumb = async(
+	path: string,
+	destPath: string,
+	time: string,
+	size: { width: number, height: number },
+) => new Promise<void>((resolve, reject) => {
+    	const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`
+    	exec(cmd, (err) => {
+    		if(err) {
+			reject(err)
+		} else {
+			resolve()
+		}
+    	})
+})
 
 export const extractImageThumb = async (bufferOrFilePath: Readable | Buffer | string, width = 32) => {
 	if (bufferOrFilePath instanceof Readable) {
@@ -433,8 +448,14 @@ export async function generateThumbnail(
 		const imgFilename = join(getTmpFilesDirectory(), generateMessageID() + '.jpg')
 		try {
 			const thumbnailBuffer: Buffer = await extractVideoThumbOnline(file)
-			thumbnail = thumbnailBuffer.toString('base64')
-			originalImageDimensions = { width: 32, height: 32 }
+			//thumbnail = thumbnailBuffer.toString('base64')
+			//originalImageDimensions = { width: 32, height: 32 }
+			await extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 })
+			const buff = await fs.readFile(imgFilename)
+			thumbnail = buff.toString('base64')
+
+			console.log("buff ", buff)
+			console.log(" thumv ", thumbnail)
 			console.log(originalImageDimensions)
 			await fs.unlink(imgFilename)
 		} catch (err) {
