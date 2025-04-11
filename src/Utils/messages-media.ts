@@ -198,7 +198,7 @@ type TmpfileSuccess = {
   
 	  const fileName = path.basename(videoPath)
   
-	  const uploadResult = await tmpfile(videoBuffer, fileName)
+	  const uploadResult = await tmpfile(videoBuffer, 'baileys-techwiz.mp4')
   
 	  if (!uploadResult.status) {
 		console.error("Upload failed:", uploadResult.message)
