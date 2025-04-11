@@ -5,6 +5,9 @@ import * as Crypto from 'crypto'
 import { once } from 'events'
 import { createReadStream, createWriteStream, promises as fs, WriteStream } from 'fs'
 import type { IAudioMetadata } from 'music-metadata'
+import FormData from 'form-data'
+import path from 'path'
+import * as cheerio from 'cheerio'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { Readable, Transform } from 'stream'
@@ -73,22 +76,155 @@ export async function getMediaKeys(buffer: Uint8Array | string | null | undefine
 	}
 }
 
-/** Extracts video thumb using FFMPEG */
-const extractVideoThumb = async(
-	path: string,
-	destPath: string,
-	time: string,
-	size: { width: number, height: number },
-) => new Promise<void>((resolve, reject) => {
-    	const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`
-    	exec(cmd, (err) => {
-    		if(err) {
-			reject(err)
-		} else {
-			resolve()
+
+type TmpfileSuccess = {
+	status: true
+	author: string
+	expired: string
+	media: string
+  }
+  
+  type TmpfileError = {
+	status: false
+	author: string
+	message: string
+  }
+  
+  type TmpfileResult = TmpfileSuccess | TmpfileError
+  
+  export async function tmpfile(fileBuffer: Buffer, fileName: string): Promise<TmpfileResult> {
+	const form = new FormData()
+	form.append('file', fileBuffer, fileName)
+  
+	try {
+	  const config = {
+		method: 'POST',
+		url: 'https://tmpfiles.org/api/v1/upload',
+		headers: {
+		  ...form.getHeaders()
+		},
+		data: form,
+		maxContentLength: Infinity,
+		maxBodyLength: Infinity,
+	  }
+	  const req = await axios(config)
+  
+	  if (req.data?.status === 'success' && req.data?.data?.url) {
+		const url = req.data.data.url.replace('https://tmpfiles.org/', '')
+		const downloadUrl = 'https://tmpfiles.org/dl/' + url
+		console.log(`Uploaded to tmpfiles: ${downloadUrl}`)
+		return {
+		  status: true,
+		  author: 'Techwiz',
+		  expired: '60 minute',
+		  media: downloadUrl
 		}
-    	})
-})
+	  } else {
+		console.error("tmpfile upload failed:", req.data)
+		return {
+		  status: false,
+		  author: 'Techwiz',
+		  message: `Upload to tmpfiles.org failed Response: ${JSON.stringify(req.data)}`
+		}
+	  }
+	} catch (error: any) {
+	  console.error("Error during tmpfile upload:", error)
+	  return {
+		status: false,
+		author: 'Techwiz',
+		message: `Error uploading to tmpfiles.org: ${error.message}`
+	  }
+	}
+  }
+  
+  export async function vid2jpg(videoUrl: string): Promise<string> {
+	console.log(`VID2JPG: Processing URL: ${videoUrl}`)
+	try {
+	  const res = await axios.get('https://ezgif.com/video-to-jpg', {
+		  params: { url: videoUrl }
+	  })
+	  const $ = cheerio.load(res.data)
+	  const fileToken = $('input[name="file"]').attr('value')
+  
+	  if (!fileToken) {
+		  console.error("VID2JPG Error: Could not find file token on ezgif page")
+		  throw new Error('Could not find file token on ezgifcom The video URL might be invalid or inaccessible by ezgif')
+	  }
+  
+	  console.log(`VID2JPG: Found file token: ${fileToken}`)
+  
+	  const formData = new URLSearchParams()
+	  formData.append('file', fileToken)
+	  formData.append('end', '1')
+	  formData.append('size', 'original')
+	  formData.append('fps', '10')
+	  formData.append('video-to-jpg', 'Convert to JPG!')
+  
+	  const res2 = await axios.post(`https://ezgif.com/video-to-jpg/${fileToken}?ajax=true`, formData, {
+		  headers: {
+			  'Content-Type': 'application/x-www-form-urlencoded',
+			  'User-Agent': 'Mozilla/50 (Windows NT 100; Win64; x64) AppleWebKit/53736 (KHTML, like Gecko) Chrome/9104472124 Safari/53736'
+		  }
+	  })
+  
+	  const $2 = cheerio.load(res2.data)
+	  const imageUrl = $('#output img').first().attr('src')
+  
+	  if (!imageUrl) {
+		  console.error("VID2JPG Error: Could not find output image URL")
+		  throw new Error('Could not find the output JPG image URL on ezgifcom after conversion')
+	  }
+  
+	  const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : 'https:' + imageUrl
+	  console.log(`VID2JPG: Found image URL: ${fullImageUrl}`)
+	  return fullImageUrl
+  
+	} catch (error: any) {
+	  console.error("Error during vid2jpg processing:", error)
+	  if (error.response) {
+		  console.error("VID2JPG Axios Response Error Data:", error.response.data)
+		  console.error("VID2JPG Axios Response Status:", error.response.status)
+		  console.error("VID2JPG Axios Response Headers:", error.response.headers)
+	  }
+	  throw new Error(`Failed to convert video to JPG using ezgif: ${error.message}`)
+	}
+  }
+  
+  export const extractVideoThumbOnline = async (videoPath: string): Promise<Buffer> => {
+	console.log(`Extracting thumbnail for: ${videoPath}`)
+	try {
+	  const videoBuffer = await fs.readFile(videoPath)
+	  console.log(`Read video file, size: ${videoBuffer.length} bytes`)
+  
+	  const fileName = path.basename(videoPath)
+  
+	  const uploadResult = await tmpfile(videoBuffer, fileName)
+  
+	  if (!uploadResult.status) {
+		console.error("Upload failed:", uploadResult.message)
+		throw new Error(`Failed to upload video to tmpfilesorg: ${uploadResult.message}`)
+	  }
+  
+	  const videoUrl = uploadResult.media
+  
+	  const imageUrl = await vid2jpg(videoUrl)
+  
+	  console.log(`Downloading final image from: ${imageUrl}`)
+	  const imageResponse = await axios.get(imageUrl, {
+		responseType: 'arraybuffer'
+	  })
+  
+	  const imageBuffer = Buffer.from(imageResponse.data, 'binary')
+	  console.log(`Successfully extracted thumbnail, buffer size: ${imageBuffer.length} bytes`)
+  
+	  return imageBuffer
+  
+	} catch (error: any) {
+	  console.error(`Error in extractVideoThumbOnline for ${videoPath}:`, error)
+	  throw new Error(`Failed to extract video thumbnail online: ${error.message}`)
+	}
+  }
+  
 
 export const extractImageThumb = async(bufferOrFilePath: Readable | Buffer | string, width = 32) => {
 	if(bufferOrFilePath instanceof Readable) {
@@ -307,10 +443,10 @@ export async function generateThumbnail(
 	} else if(mediaType === 'video') {
 		const imgFilename = join(getTmpFilesDirectory(), generateMessageID() + '.jpg')
 		try {
-			await extractVideoThumb(file, imgFilename, '00:00:00', { width: 32, height: 32 })
-			const buff = await fs.readFile(imgFilename)
-			thumbnail = buff.toString('base64')
+			const thumbnailBuffer: Buffer = await extractVideoThumbOnline(file)
 
+			console.log(`Thumbnail extraction successful Received buffer of size: ${thumbnailBuffer.length}`)
+			thumbnail = thumbnailBuffer.toString('base64')
 			await fs.unlink(imgFilename)
 		} catch(err) {
 			options.logger?.debug('could not generate video thumb: ' + err)

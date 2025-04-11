@@ -6,6 +6,7 @@
 auth_info*.json
 baileys_auth_info*
 baileys_store*.json
+package-lock.json
 browser-messages.json
 browser-token.json
 decoded-ws.json
