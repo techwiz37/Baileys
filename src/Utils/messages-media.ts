@@ -434,7 +434,8 @@ export async function generateThumbnail(
 		try {
 			const thumbnailBuffer: Buffer = await extractVideoThumbOnline(file)
 			thumbnail = thumbnailBuffer.toString('base64')
-			console.log(thumbnail)
+			originalImageDimensions = { width: 32, height: 32 }
+			console.log(originalImageDimensions)
 			await fs.unlink(imgFilename)
 		} catch (err) {
 			options.logger?.debug('could not generate video thumb: ' + err)
