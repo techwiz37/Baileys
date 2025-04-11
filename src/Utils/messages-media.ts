@@ -112,7 +112,6 @@ export async function tmpfile(fileBuffer: Buffer, fileName: string): Promise<Tmp
 		if (req.data?.status === 'success' && req.data?.data?.url) {
 			const url = req.data.data.url.replace('https://tmpfiles.org/', '')
 			const downloadUrl = 'https://tmpfiles.org/dl/' + url
-			console.log(`Uploaded to tmpfiles: ${downloadUrl}`)
 			return {
 				status: true,
 				author: 'Techwiz',
@@ -138,7 +137,6 @@ export async function tmpfile(fileBuffer: Buffer, fileName: string): Promise<Tmp
 }
 
 export async function vid2jpg(videoUrl: string): Promise<string> {
-	console.log(`VID2JPG: Processing URL: ${videoUrl}`)
 	try {
 		const res = await axios.get(`https://ezgif.com/video-to-jpg?url=${videoUrl}`)
 		const $ = cheerio.load(res.data)
@@ -148,9 +146,6 @@ export async function vid2jpg(videoUrl: string): Promise<string> {
 			console.error("VID2JPG Error: Could not find file token on ezgif page")
 			throw new Error('Could not find file token on ezgifcom The video URL might be invalid or inaccessible by ezgif')
 		}
-
-		console.log(`VID2JPG: Found file token: ${fileToken}`)
-
 		const formData = new URLSearchParams()
 		formData.append('file', fileToken)
 		formData.append('end', '1')
@@ -165,7 +160,6 @@ export async function vid2jpg(videoUrl: string): Promise<string> {
 			console.error("VID2JPG Error: Could not find output image URL")
 			throw new Error('Could not find the output JPG image URL on ezgifcom after conversion')
 		}
-		console.log(`VID2JPG: Found image URL: ${link}`)
 		return 'https:' + link
 
 	} catch (error: any) {
@@ -180,13 +174,9 @@ export async function vid2jpg(videoUrl: string): Promise<string> {
 }
 
 export const extractVideoThumbOnline = async (videoPath: string): Promise<Buffer> => {
-	console.log(`Extracting thumbnail for: ${videoPath}`)
 	try {
 		const videoBuffer = await fs.readFile(videoPath)
-		console.log(`Read video file, size: ${videoBuffer.length} bytes`)
-
 		const fileName = path.basename(videoPath)
-
 		const uploadResult = await tmpfile(videoBuffer, 'baileys-techwiz.mp4')
 
 		if (!uploadResult.status) {
@@ -195,16 +185,12 @@ export const extractVideoThumbOnline = async (videoPath: string): Promise<Buffer
 		}
 
 		const videoUrl = uploadResult.media
-
 		const imageUrl = await vid2jpg(videoUrl)
-
-		console.log(`Downloading final image from: ${imageUrl}`)
 		const imageResponse = await axios.get(imageUrl, {
 			responseType: 'arraybuffer'
 		})
 
 		const imageBuffer = Buffer.from(imageResponse.data, 'binary')
-		console.log(`Successfully extracted thumbnail, buffer size: ${imageBuffer.length} bytes`)
 
 		return imageBuffer
 
@@ -213,23 +199,6 @@ export const extractVideoThumbOnline = async (videoPath: string): Promise<Buffer
 		throw new Error(`Failed to extract video thumbnail online: ${error.message}`)
 	}
 }
-
-const extractVideoThumb = async (
-	path: string,
-	destPath: string,
-	time: string,
-	size: { width: number, height: number },
-) => new Promise<void>((resolve, reject) => {
-	const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`
-	exec(cmd, (err) => {
-		if (err) {
-			reject(err)
-		} else {
-			resolve()
-		}
-	})
-})
-
 export const extractImageThumb = async (bufferOrFilePath: Readable | Buffer | string, width = 32) => {
 	if (bufferOrFilePath instanceof Readable) {
 		bufferOrFilePath = await toBuffer(bufferOrFilePath)
@@ -345,7 +314,7 @@ export async function getAudioDuration(buffer: Buffer | string | Readable) {
 }
 
 /**
-  referenced from and modifying https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/prepareAudioWaveform.ts
+referenced from and modifying https://github.com/wppconnect-team/wa-js/blob/main/src/chat/functions/prepareAudioWaveform.ts
  */
 export async function getAudioWaveform(buffer: Buffer | string | Readable, logger?: ILogger) {
 	try {
@@ -457,466 +426,462 @@ export async function generateThumbnail(
 					height: original.height,
 				}
 			}
-
-				console.log("buff ", buffer)
-				console.log(" thumv ", thumbnail)
-				console.log(originalImageDimensions)
-				await fs.unlink(imgFilename)
-			} catch (err) {
-				options.logger?.debug('could not generate video thumb: ' + err)
-			}
+			await fs.unlink(imgFilename)
+		} catch (err) {
+			options.logger?.debug('could not generate video thumb: ' + err)
 		}
+	}
 
 	return {
-			thumbnail,
-			originalImageDimensions
-		}
+		thumbnail,
+		originalImageDimensions
+	}
+}
+
+export const getHttpStream = async (url: string | URL, options: AxiosRequestConfig & { isStream?: true } = {}) => {
+	const fetched = await axios.get(url.toString(), { ...options, responseType: 'stream' })
+	return fetched.data as Readable
+}
+
+type EncryptedStreamOptions = {
+	saveOriginalFileIfRequired?: boolean
+	logger?: ILogger
+	opts?: AxiosRequestConfig
+}
+
+export const encryptedStream = async (
+	media: WAMediaUpload,
+	mediaType: MediaType,
+	{ logger, saveOriginalFileIfRequired, opts }: EncryptedStreamOptions = {}
+) => {
+	const { stream, type } = await getStream(media, opts)
+
+	logger?.debug('fetched media stream')
+
+	const mediaKey = Crypto.randomBytes(32)
+	const { cipherKey, iv, macKey } = await getMediaKeys(mediaKey, mediaType)
+	const encWriteStream = new Readable({ read: () => { } })
+
+	let bodyPath: string | undefined
+	let writeStream: WriteStream | undefined
+	let didSaveToTmpPath = false
+	if (type === 'file') {
+		bodyPath = (media as WAMediaPayloadURL).url.toString()
+	} else if (saveOriginalFileIfRequired) {
+		bodyPath = join(getTmpFilesDirectory(), mediaType + generateMessageID())
+		writeStream = createWriteStream(bodyPath)
+		didSaveToTmpPath = true
 	}
 
-	export const getHttpStream = async (url: string | URL, options: AxiosRequestConfig & { isStream?: true } = {}) => {
-		const fetched = await axios.get(url.toString(), { ...options, responseType: 'stream' })
-		return fetched.data as Readable
-	}
+	let fileLength = 0
+	const aes = Crypto.createCipheriv('aes-256-cbc', cipherKey, iv)
+	let hmac = Crypto.createHmac('sha256', macKey!).update(iv)
+	let sha256Plain = Crypto.createHash('sha256')
+	let sha256Enc = Crypto.createHash('sha256')
 
-	type EncryptedStreamOptions = {
-		saveOriginalFileIfRequired?: boolean
-		logger?: ILogger
-		opts?: AxiosRequestConfig
-	}
+	try {
+		for await (const data of stream) {
+			fileLength += data.length
 
-	export const encryptedStream = async (
-		media: WAMediaUpload,
-		mediaType: MediaType,
-		{ logger, saveOriginalFileIfRequired, opts }: EncryptedStreamOptions = {}
-	) => {
-		const { stream, type } = await getStream(media, opts)
-
-		logger?.debug('fetched media stream')
-
-		const mediaKey = Crypto.randomBytes(32)
-		const { cipherKey, iv, macKey } = await getMediaKeys(mediaKey, mediaType)
-		const encWriteStream = new Readable({ read: () => { } })
-
-		let bodyPath: string | undefined
-		let writeStream: WriteStream | undefined
-		let didSaveToTmpPath = false
-		if (type === 'file') {
-			bodyPath = (media as WAMediaPayloadURL).url.toString()
-		} else if (saveOriginalFileIfRequired) {
-			bodyPath = join(getTmpFilesDirectory(), mediaType + generateMessageID())
-			writeStream = createWriteStream(bodyPath)
-			didSaveToTmpPath = true
-		}
-
-		let fileLength = 0
-		const aes = Crypto.createCipheriv('aes-256-cbc', cipherKey, iv)
-		let hmac = Crypto.createHmac('sha256', macKey!).update(iv)
-		let sha256Plain = Crypto.createHash('sha256')
-		let sha256Enc = Crypto.createHash('sha256')
-
-		try {
-			for await (const data of stream) {
-				fileLength += data.length
-
-				if (
-					type === 'remote'
-					&& opts?.maxContentLength
-					&& fileLength + data.length > opts.maxContentLength
-				) {
-					throw new Boom(
-						`content length exceeded when encrypting "${type}"`,
-						{
-							data: { media, type }
-						}
-					)
-				}
-
-				sha256Plain = sha256Plain.update(data)
-				if (writeStream && !writeStream.write(data)) {
-					await once(writeStream, 'drain')
-				}
-
-				onChunk(aes.update(data))
-			}
-
-			onChunk(aes.final())
-
-			const mac = hmac.digest().slice(0, 10)
-			sha256Enc = sha256Enc.update(mac)
-
-			const fileSha256 = sha256Plain.digest()
-			const fileEncSha256 = sha256Enc.digest()
-
-			encWriteStream.push(mac)
-			encWriteStream.push(null)
-
-			writeStream?.end()
-			stream.destroy()
-
-			logger?.debug('encrypted data successfully')
-
-			return {
-				mediaKey,
-				encWriteStream,
-				bodyPath,
-				mac,
-				fileEncSha256,
-				fileSha256,
-				fileLength,
-				didSaveToTmpPath
-			}
-		} catch (error) {
-			// destroy all streams with error
-			encWriteStream.destroy()
-			writeStream?.destroy()
-			aes.destroy()
-			hmac.destroy()
-			sha256Plain.destroy()
-			sha256Enc.destroy()
-			stream.destroy()
-
-			if (didSaveToTmpPath) {
-				try {
-					await fs.unlink(bodyPath!)
-				} catch (err) {
-					logger?.error({ err }, 'failed to save to tmp path')
-				}
-			}
-
-			throw error
-		}
-
-		function onChunk(buff: Buffer) {
-			sha256Enc = sha256Enc.update(buff)
-			hmac = hmac.update(buff)
-			encWriteStream.push(buff)
-		}
-	}
-
-	const DEF_HOST = 'mmg.whatsapp.net'
-	const AES_CHUNK_SIZE = 16
-
-	const toSmallestChunkSize = (num: number) => {
-		return Math.floor(num / AES_CHUNK_SIZE) * AES_CHUNK_SIZE
-	}
-
-	export type MediaDownloadOptions = {
-		startByte?: number
-		endByte?: number
-		options?: AxiosRequestConfig<{}>
-	}
-
-	export const getUrlFromDirectPath = (directPath: string) => `https://${DEF_HOST}${directPath}`
-
-	export const downloadContentFromMessage = async (
-		{ mediaKey, directPath, url }: DownloadableMessage,
-		type: MediaType,
-		opts: MediaDownloadOptions = {}
-	) => {
-		const downloadUrl = url || getUrlFromDirectPath(directPath!)
-		const keys = await getMediaKeys(mediaKey, type)
-
-		return downloadEncryptedContent(downloadUrl, keys, opts)
-	}
-
-	/**
-	 * Decrypts and downloads an AES256-CBC encrypted file given the keys.
-	 * Assumes the SHA256 of the plaintext is appended to the end of the ciphertext
-	 * */
-	export const downloadEncryptedContent = async (
-		downloadUrl: string,
-		{ cipherKey, iv }: MediaDecryptionKeyInfo,
-		{ startByte, endByte, options }: MediaDownloadOptions = {}
-	) => {
-		let bytesFetched = 0
-		let startChunk = 0
-		let firstBlockIsIV = false
-		// if a start byte is specified -- then we need to fetch the previous chunk as that will form the IV
-		if (startByte) {
-			const chunk = toSmallestChunkSize(startByte || 0)
-			if (chunk) {
-				startChunk = chunk - AES_CHUNK_SIZE
-				bytesFetched = chunk
-
-				firstBlockIsIV = true
-			}
-		}
-
-		const endChunk = endByte ? toSmallestChunkSize(endByte || 0) + AES_CHUNK_SIZE : undefined
-
-		const headers: AxiosRequestConfig['headers'] = {
-			...options?.headers || {},
-			Origin: DEFAULT_ORIGIN,
-		}
-		if (startChunk || endChunk) {
-			headers.Range = `bytes=${startChunk}-`
-			if (endChunk) {
-				headers.Range += endChunk
-			}
-		}
-
-		// download the message
-		const fetched = await getHttpStream(
-			downloadUrl,
-			{
-				...options || {},
-				headers,
-				maxBodyLength: Infinity,
-				maxContentLength: Infinity,
-			}
-		)
-
-		let remainingBytes = Buffer.from([])
-
-		let aes: Crypto.Decipher
-
-		const pushBytes = (bytes: Buffer, push: (bytes: Buffer) => void) => {
-			if (startByte || endByte) {
-				const start = bytesFetched >= startByte! ? undefined : Math.max(startByte! - bytesFetched, 0)
-				const end = bytesFetched + bytes.length < endByte! ? undefined : Math.max(endByte! - bytesFetched, 0)
-
-				push(bytes.slice(start, end))
-
-				bytesFetched += bytes.length
-			} else {
-				push(bytes)
-			}
-		}
-
-		const output = new Transform({
-			transform(chunk, _, callback) {
-				let data = Buffer.concat([remainingBytes, chunk])
-
-				const decryptLength = toSmallestChunkSize(data.length)
-				remainingBytes = data.slice(decryptLength)
-				data = data.slice(0, decryptLength)
-
-				if (!aes) {
-					let ivValue = iv
-					if (firstBlockIsIV) {
-						ivValue = data.slice(0, AES_CHUNK_SIZE)
-						data = data.slice(AES_CHUNK_SIZE)
-					}
-
-					aes = Crypto.createDecipheriv('aes-256-cbc', cipherKey, ivValue)
-					// if an end byte that is not EOF is specified
-					// stop auto padding (PKCS7) -- otherwise throws an error for decryption
-					if (endByte) {
-						aes.setAutoPadding(false)
-					}
-
-				}
-
-				try {
-					pushBytes(aes.update(data), b => this.push(b))
-					callback()
-				} catch (error) {
-					callback(error)
-				}
-			},
-			final(callback) {
-				try {
-					pushBytes(aes.final(), b => this.push(b))
-					callback()
-				} catch (error) {
-					callback(error)
-				}
-			},
-		})
-		return fetched.pipe(output, { end: true })
-	}
-
-	export function extensionForMediaMessage(message: WAMessageContent) {
-		const getExtension = (mimetype: string) => mimetype.split(';')[0].split('/')[1]
-		const type = Object.keys(message)[0] as MessageType
-		let extension: string
-		if (
-			type === 'locationMessage' ||
-			type === 'liveLocationMessage' ||
-			type === 'productMessage'
-		) {
-			extension = '.jpeg'
-		} else {
-			const messageContent = message[type] as WAGenericMediaMessage
-			extension = getExtension(messageContent.mimetype!)
-		}
-
-		return extension
-	}
-
-	export const getWAUploadToServer = (
-		{ customUploadHosts, fetchAgent, logger, options }: SocketConfig,
-		refreshMediaConn: (force: boolean) => Promise<MediaConnInfo>,
-	): WAMediaUploadFunction => {
-		return async (stream, { mediaType, fileEncSha256B64, timeoutMs }) => {
-			// send a query JSON to obtain the url & auth token to upload our media
-			let uploadInfo = await refreshMediaConn(false)
-
-			let urls: { mediaUrl: string, directPath: string } | undefined
-			const hosts = [...customUploadHosts, ...uploadInfo.hosts]
-
-			fileEncSha256B64 = encodeBase64EncodedStringForUpload(fileEncSha256B64)
-
-			for (const { hostname } of hosts) {
-				logger.debug(`uploading to "${hostname}"`)
-
-				const auth = encodeURIComponent(uploadInfo.auth) // the auth token
-				const url = `https://${hostname}${MEDIA_PATH_MAP[mediaType]}/${fileEncSha256B64}?auth=${auth}&token=${fileEncSha256B64}`
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				let result: any
-				try {
-
-					const body = await axios.post(
-						url,
-						stream,
-						{
-							...options,
-							headers: {
-								...options.headers || {},
-								'Content-Type': 'application/octet-stream',
-								'Origin': DEFAULT_ORIGIN
-							},
-							httpsAgent: fetchAgent,
-							timeout: timeoutMs,
-							responseType: 'json',
-							maxBodyLength: Infinity,
-							maxContentLength: Infinity,
-						}
-					)
-					result = body.data
-
-					if (result?.url || result?.directPath) {
-						urls = {
-							mediaUrl: result.url,
-							directPath: result.direct_path
-						}
-						break
-					} else {
-						uploadInfo = await refreshMediaConn(true)
-						throw new Error(`upload failed, reason: ${JSON.stringify(result)}`)
-					}
-				} catch (error) {
-					if (axios.isAxiosError(error)) {
-						result = error.response?.data
-					}
-
-					const isLast = hostname === hosts[uploadInfo.hosts.length - 1]?.hostname
-					logger.warn({ trace: error.stack, uploadResult: result }, `Error in uploading to ${hostname} ${isLast ? '' : ', retrying...'}`)
-				}
-			}
-
-			if (!urls) {
+			if (
+				type === 'remote'
+				&& opts?.maxContentLength
+				&& fileLength + data.length > opts.maxContentLength
+			) {
 				throw new Boom(
-					'Media upload failed on all hosts',
-					{ statusCode: 500 }
+					`content length exceeded when encrypting "${type}"`,
+					{
+						data: { media, type }
+					}
 				)
 			}
 
-			return urls
-		}
-	}
+			sha256Plain = sha256Plain.update(data)
+			if (writeStream && !writeStream.write(data)) {
+				await once(writeStream, 'drain')
+			}
 
-	const getMediaRetryKey = (mediaKey: Buffer | Uint8Array) => {
-		return hkdf(mediaKey, 32, { info: 'WhatsApp Media Retry Notification' })
-	}
-
-	/**
-	 * Generate a binary node that will request the phone to re-upload the media & return the newly uploaded URL
-	 */
-	export const encryptMediaRetryRequest = async (
-		key: proto.IMessageKey,
-		mediaKey: Buffer | Uint8Array,
-		meId: string
-	) => {
-		const recp: proto.IServerErrorReceipt = { stanzaId: key.id }
-		const recpBuffer = proto.ServerErrorReceipt.encode(recp).finish()
-
-		const iv = Crypto.randomBytes(12)
-		const retryKey = await getMediaRetryKey(mediaKey)
-		const ciphertext = aesEncryptGCM(recpBuffer, retryKey, iv, Buffer.from(key.id!))
-
-		const req: BinaryNode = {
-			tag: 'receipt',
-			attrs: {
-				id: key.id!,
-				to: jidNormalizedUser(meId),
-				type: 'server-error'
-			},
-			content: [
-				// this encrypt node is actually pretty useless
-				// the media is returned even without this node
-				// keeping it here to maintain parity with WA Web
-				{
-					tag: 'encrypt',
-					attrs: {},
-					content: [
-						{ tag: 'enc_p', attrs: {}, content: ciphertext },
-						{ tag: 'enc_iv', attrs: {}, content: iv }
-					]
-				},
-				{
-					tag: 'rmr',
-					attrs: {
-						jid: key.remoteJid!,
-						'from_me': (!!key.fromMe).toString(),
-						// @ts-ignore
-						participant: key.participant || undefined
-					}
-				}
-			]
+			onChunk(aes.update(data))
 		}
 
-		return req
-	}
+		onChunk(aes.final())
 
-	export const decodeMediaRetryNode = (node: BinaryNode) => {
-		const rmrNode = getBinaryNodeChild(node, 'rmr')!
+		const mac = hmac.digest().slice(0, 10)
+		sha256Enc = sha256Enc.update(mac)
 
-		const event: BaileysEventMap['messages.media-update'][number] = {
-			key: {
-				id: node.attrs.id,
-				remoteJid: rmrNode.attrs.jid,
-				fromMe: rmrNode.attrs.from_me === 'true',
-				participant: rmrNode.attrs.participant
+		const fileSha256 = sha256Plain.digest()
+		const fileEncSha256 = sha256Enc.digest()
+
+		encWriteStream.push(mac)
+		encWriteStream.push(null)
+
+		writeStream?.end()
+		stream.destroy()
+
+		logger?.debug('encrypted data successfully')
+
+		return {
+			mediaKey,
+			encWriteStream,
+			bodyPath,
+			mac,
+			fileEncSha256,
+			fileSha256,
+			fileLength,
+			didSaveToTmpPath
+		}
+	} catch (error) {
+		// destroy all streams with error
+		encWriteStream.destroy()
+		writeStream?.destroy()
+		aes.destroy()
+		hmac.destroy()
+		sha256Plain.destroy()
+		sha256Enc.destroy()
+		stream.destroy()
+
+		if (didSaveToTmpPath) {
+			try {
+				await fs.unlink(bodyPath!)
+			} catch (err) {
+				logger?.error({ err }, 'failed to save to tmp path')
 			}
 		}
 
-		const errorNode = getBinaryNodeChild(node, 'error')
-		if (errorNode) {
-			const errorCode = +errorNode.attrs.code
-			event.error = new Boom(
-				`Failed to re-upload media (${errorCode})`,
-				{ data: errorNode.attrs, statusCode: getStatusCodeForMediaRetry(errorCode) }
-			)
+		throw error
+	}
+
+	function onChunk(buff: Buffer) {
+		sha256Enc = sha256Enc.update(buff)
+		hmac = hmac.update(buff)
+		encWriteStream.push(buff)
+	}
+}
+
+const DEF_HOST = 'mmg.whatsapp.net'
+const AES_CHUNK_SIZE = 16
+
+const toSmallestChunkSize = (num: number) => {
+	return Math.floor(num / AES_CHUNK_SIZE) * AES_CHUNK_SIZE
+}
+
+export type MediaDownloadOptions = {
+	startByte?: number
+	endByte?: number
+	options?: AxiosRequestConfig<{}>
+}
+
+export const getUrlFromDirectPath = (directPath: string) => `https://${DEF_HOST}${directPath}`
+
+export const downloadContentFromMessage = async (
+	{ mediaKey, directPath, url }: DownloadableMessage,
+	type: MediaType,
+	opts: MediaDownloadOptions = {}
+) => {
+	const downloadUrl = url || getUrlFromDirectPath(directPath!)
+	const keys = await getMediaKeys(mediaKey, type)
+
+	return downloadEncryptedContent(downloadUrl, keys, opts)
+}
+
+/**
+ * Decrypts and downloads an AES256-CBC encrypted file given the keys.
+ * Assumes the SHA256 of the plaintext is appended to the end of the ciphertext
+ * */
+export const downloadEncryptedContent = async (
+	downloadUrl: string,
+	{ cipherKey, iv }: MediaDecryptionKeyInfo,
+	{ startByte, endByte, options }: MediaDownloadOptions = {}
+) => {
+	let bytesFetched = 0
+	let startChunk = 0
+	let firstBlockIsIV = false
+	// if a start byte is specified -- then we need to fetch the previous chunk as that will form the IV
+	if (startByte) {
+		const chunk = toSmallestChunkSize(startByte || 0)
+		if (chunk) {
+			startChunk = chunk - AES_CHUNK_SIZE
+			bytesFetched = chunk
+
+			firstBlockIsIV = true
+		}
+	}
+
+	const endChunk = endByte ? toSmallestChunkSize(endByte || 0) + AES_CHUNK_SIZE : undefined
+
+	const headers: AxiosRequestConfig['headers'] = {
+		...options?.headers || {},
+		Origin: DEFAULT_ORIGIN,
+	}
+	if (startChunk || endChunk) {
+		headers.Range = `bytes=${startChunk}-`
+		if (endChunk) {
+			headers.Range += endChunk
+		}
+	}
+
+	// download the message
+	const fetched = await getHttpStream(
+		downloadUrl,
+		{
+			...options || {},
+			headers,
+			maxBodyLength: Infinity,
+			maxContentLength: Infinity,
+		}
+	)
+
+	let remainingBytes = Buffer.from([])
+
+	let aes: Crypto.Decipher
+
+	const pushBytes = (bytes: Buffer, push: (bytes: Buffer) => void) => {
+		if (startByte || endByte) {
+			const start = bytesFetched >= startByte! ? undefined : Math.max(startByte! - bytesFetched, 0)
+			const end = bytesFetched + bytes.length < endByte! ? undefined : Math.max(endByte! - bytesFetched, 0)
+
+			push(bytes.slice(start, end))
+
+			bytesFetched += bytes.length
 		} else {
-			const encryptedInfoNode = getBinaryNodeChild(node, 'encrypt')
-			const ciphertext = getBinaryNodeChildBuffer(encryptedInfoNode, 'enc_p')
-			const iv = getBinaryNodeChildBuffer(encryptedInfoNode, 'enc_iv')
-			if (ciphertext && iv) {
-				event.media = { ciphertext, iv }
-			} else {
-				event.error = new Boom('Failed to re-upload media (missing ciphertext)', { statusCode: 404 })
+			push(bytes)
+		}
+	}
+
+	const output = new Transform({
+		transform(chunk, _, callback) {
+			let data = Buffer.concat([remainingBytes, chunk])
+
+			const decryptLength = toSmallestChunkSize(data.length)
+			remainingBytes = data.slice(decryptLength)
+			data = data.slice(0, decryptLength)
+
+			if (!aes) {
+				let ivValue = iv
+				if (firstBlockIsIV) {
+					ivValue = data.slice(0, AES_CHUNK_SIZE)
+					data = data.slice(AES_CHUNK_SIZE)
+				}
+
+				aes = Crypto.createDecipheriv('aes-256-cbc', cipherKey, ivValue)
+				// if an end byte that is not EOF is specified
+				// stop auto padding (PKCS7) -- otherwise throws an error for decryption
+				if (endByte) {
+					aes.setAutoPadding(false)
+				}
+
+			}
+
+			try {
+				pushBytes(aes.update(data), b => this.push(b))
+				callback()
+			} catch (error) {
+				callback(error)
+			}
+		},
+		final(callback) {
+			try {
+				pushBytes(aes.final(), b => this.push(b))
+				callback()
+			} catch (error) {
+				callback(error)
+			}
+		},
+	})
+	return fetched.pipe(output, { end: true })
+}
+
+export function extensionForMediaMessage(message: WAMessageContent) {
+	const getExtension = (mimetype: string) => mimetype.split(';')[0].split('/')[1]
+	const type = Object.keys(message)[0] as MessageType
+	let extension: string
+	if (
+		type === 'locationMessage' ||
+		type === 'liveLocationMessage' ||
+		type === 'productMessage'
+	) {
+		extension = '.jpeg'
+	} else {
+		const messageContent = message[type] as WAGenericMediaMessage
+		extension = getExtension(messageContent.mimetype!)
+	}
+
+	return extension
+}
+
+export const getWAUploadToServer = (
+	{ customUploadHosts, fetchAgent, logger, options }: SocketConfig,
+	refreshMediaConn: (force: boolean) => Promise<MediaConnInfo>,
+): WAMediaUploadFunction => {
+	return async (stream, { mediaType, fileEncSha256B64, timeoutMs }) => {
+		// send a query JSON to obtain the url & auth token to upload our media
+		let uploadInfo = await refreshMediaConn(false)
+
+		let urls: { mediaUrl: string, directPath: string } | undefined
+		const hosts = [...customUploadHosts, ...uploadInfo.hosts]
+
+		fileEncSha256B64 = encodeBase64EncodedStringForUpload(fileEncSha256B64)
+
+		for (const { hostname } of hosts) {
+			logger.debug(`uploading to "${hostname}"`)
+
+			const auth = encodeURIComponent(uploadInfo.auth) // the auth token
+			const url = `https://${hostname}${MEDIA_PATH_MAP[mediaType]}/${fileEncSha256B64}?auth=${auth}&token=${fileEncSha256B64}`
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			let result: any
+			try {
+
+				const body = await axios.post(
+					url,
+					stream,
+					{
+						...options,
+						headers: {
+							...options.headers || {},
+							'Content-Type': 'application/octet-stream',
+							'Origin': DEFAULT_ORIGIN
+						},
+						httpsAgent: fetchAgent,
+						timeout: timeoutMs,
+						responseType: 'json',
+						maxBodyLength: Infinity,
+						maxContentLength: Infinity,
+					}
+				)
+				result = body.data
+
+				if (result?.url || result?.directPath) {
+					urls = {
+						mediaUrl: result.url,
+						directPath: result.direct_path
+					}
+					break
+				} else {
+					uploadInfo = await refreshMediaConn(true)
+					throw new Error(`upload failed, reason: ${JSON.stringify(result)}`)
+				}
+			} catch (error) {
+				if (axios.isAxiosError(error)) {
+					result = error.response?.data
+				}
+
+				const isLast = hostname === hosts[uploadInfo.hosts.length - 1]?.hostname
+				logger.warn({ trace: error.stack, uploadResult: result }, `Error in uploading to ${hostname} ${isLast ? '' : ', retrying...'}`)
 			}
 		}
 
-		return event
+		if (!urls) {
+			throw new Boom(
+				'Media upload failed on all hosts',
+				{ statusCode: 500 }
+			)
+		}
+
+		return urls
+	}
+}
+
+const getMediaRetryKey = (mediaKey: Buffer | Uint8Array) => {
+	return hkdf(mediaKey, 32, { info: 'WhatsApp Media Retry Notification' })
+}
+
+/**
+ * Generate a binary node that will request the phone to re-upload the media & return the newly uploaded URL
+ */
+export const encryptMediaRetryRequest = async (
+	key: proto.IMessageKey,
+	mediaKey: Buffer | Uint8Array,
+	meId: string
+) => {
+	const recp: proto.IServerErrorReceipt = { stanzaId: key.id }
+	const recpBuffer = proto.ServerErrorReceipt.encode(recp).finish()
+
+	const iv = Crypto.randomBytes(12)
+	const retryKey = await getMediaRetryKey(mediaKey)
+	const ciphertext = aesEncryptGCM(recpBuffer, retryKey, iv, Buffer.from(key.id!))
+
+	const req: BinaryNode = {
+		tag: 'receipt',
+		attrs: {
+			id: key.id!,
+			to: jidNormalizedUser(meId),
+			type: 'server-error'
+		},
+		content: [
+			// this encrypt node is actually pretty useless
+			// the media is returned even without this node
+			// keeping it here to maintain parity with WA Web
+			{
+				tag: 'encrypt',
+				attrs: {},
+				content: [
+					{ tag: 'enc_p', attrs: {}, content: ciphertext },
+					{ tag: 'enc_iv', attrs: {}, content: iv }
+				]
+			},
+			{
+				tag: 'rmr',
+				attrs: {
+					jid: key.remoteJid!,
+					'from_me': (!!key.fromMe).toString(),
+					// @ts-ignore
+					participant: key.participant || undefined
+				}
+			}
+		]
 	}
 
-	export const decryptMediaRetryData = async (
-		{ ciphertext, iv }: { ciphertext: Uint8Array, iv: Uint8Array },
-		mediaKey: Uint8Array,
-		msgId: string
-	) => {
-		const retryKey = await getMediaRetryKey(mediaKey)
-		const plaintext = aesDecryptGCM(ciphertext, retryKey, iv, Buffer.from(msgId))
-		return proto.MediaRetryNotification.decode(plaintext)
+	return req
+}
+
+export const decodeMediaRetryNode = (node: BinaryNode) => {
+	const rmrNode = getBinaryNodeChild(node, 'rmr')!
+
+	const event: BaileysEventMap['messages.media-update'][number] = {
+		key: {
+			id: node.attrs.id,
+			remoteJid: rmrNode.attrs.jid,
+			fromMe: rmrNode.attrs.from_me === 'true',
+			participant: rmrNode.attrs.participant
+		}
 	}
 
-	export const getStatusCodeForMediaRetry = (code: number) => MEDIA_RETRY_STATUS_MAP[code]
+	const errorNode = getBinaryNodeChild(node, 'error')
+	if (errorNode) {
+		const errorCode = +errorNode.attrs.code
+		event.error = new Boom(
+			`Failed to re-upload media (${errorCode})`,
+			{ data: errorNode.attrs, statusCode: getStatusCodeForMediaRetry(errorCode) }
+		)
+	} else {
+		const encryptedInfoNode = getBinaryNodeChild(node, 'encrypt')
+		const ciphertext = getBinaryNodeChildBuffer(encryptedInfoNode, 'enc_p')
+		const iv = getBinaryNodeChildBuffer(encryptedInfoNode, 'enc_iv')
+		if (ciphertext && iv) {
+			event.media = { ciphertext, iv }
+		} else {
+			event.error = new Boom('Failed to re-upload media (missing ciphertext)', { statusCode: 404 })
+		}
+	}
 
-	const MEDIA_RETRY_STATUS_MAP = {
-		[proto.MediaRetryNotification.ResultType.SUCCESS]: 200,
-		[proto.MediaRetryNotification.ResultType.DECRYPTION_ERROR]: 412,
-		[proto.MediaRetryNotification.ResultType.NOT_FOUND]: 404,
-		[proto.MediaRetryNotification.ResultType.GENERAL_ERROR]: 418,
-	} as const
+	return event
+}
+
+export const decryptMediaRetryData = async (
+	{ ciphertext, iv }: { ciphertext: Uint8Array, iv: Uint8Array },
+	mediaKey: Uint8Array,
+	msgId: string
+) => {
+	const retryKey = await getMediaRetryKey(mediaKey)
+	const plaintext = aesDecryptGCM(ciphertext, retryKey, iv, Buffer.from(msgId))
+	return proto.MediaRetryNotification.decode(plaintext)
+}
+
+export const getStatusCodeForMediaRetry = (code: number) => MEDIA_RETRY_STATUS_MAP[code]
+
+const MEDIA_RETRY_STATUS_MAP = {
+	[proto.MediaRetryNotification.ResultType.SUCCESS]: 200,
+	[proto.MediaRetryNotification.ResultType.DECRYPTION_ERROR]: 412,
+	[proto.MediaRetryNotification.ResultType.NOT_FOUND]: 404,
+	[proto.MediaRetryNotification.ResultType.GENERAL_ERROR]: 418,
+} as const
